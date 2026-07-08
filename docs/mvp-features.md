@@ -39,9 +39,9 @@ in MVP.)
 - [ ] "Play again" keeps the lobby (everyone already seated, eliminated players included), fresh game state.
 
 ### 7. Simulation harness
-- [ ] Console app: bots with distinct strategies (aggressive, greedy/chest-rusher, turtle, random, adaptive).
-- [ ] Parameter sweeps: HP, max bullets, bars-to-win, chest thresholds, duel stalemate guard.
-- [ ] Report: game length distribution, win rate per strategy, stalemate frequency → pick MVP defaults.
+- [x] Console app: bots with distinct strategies (aggressive, greedy/chest-rusher, turtle, random, adaptive).
+- [x] Parameter sweeps: HP, max bullets, bars-to-win, chest thresholds, duel stalemate guard.
+- [x] Report: game length distribution, win rate per strategy, stalemate frequency → defaults confirmed, see [simulation-results.md](simulation-results.md).
 
 ### 8. Tests & infra
 - [x] Engine unit tests (xUnit) covering every rule and edge case in the spec.
@@ -62,8 +62,8 @@ in MVP.)
 ## Suggested build order
 
 1. **Engine + unit tests** — the rules spec above, pure C#. ✅ done
-2. **Simulation harness** — validate the game is actually fun/quick on paper; lock parameters. ⬅ next
-3. **Server + SignalR hub + integration tests** — lobby, rounds, reveal broadcast.
+2. **Simulation harness** — validate the game is actually fun/quick on paper; lock parameters. ✅ done
+3. **Server + SignalR hub + integration tests** — lobby, rounds, reveal broadcast. ⬅ next
 4. **Player page** — join → play → reveal loop (functional, minimal styling).
 5. **Monitor page** — reuse the reveal renderer at TV size.
 6. **Drama pass** — animations, sound, winner ceremony.

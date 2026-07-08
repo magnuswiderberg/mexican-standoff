@@ -38,7 +38,13 @@ public sealed record GameState
         {
             Parameters = parameters,
             Players = players
-                .Select(p => new PlayerState { Id = p.Id, Name = p.Name, Hp = parameters.StartingHp })
+                .Select(p => new PlayerState
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Hp = parameters.StartingHp,
+                    Bullets = Math.Min(parameters.StartingBullets, parameters.MaxBullets),
+                })
                 .ToArray(),
         };
     }

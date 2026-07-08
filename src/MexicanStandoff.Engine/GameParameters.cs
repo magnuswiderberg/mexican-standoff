@@ -8,6 +8,9 @@ public sealed record GameParameters
 {
     public int StartingHp { get; init; } = 2;
     public int MaxBullets { get; init; } = 2;
+
+    /// <summary>Bullets in the gun at game start (capped at <see cref="MaxBullets"/>).</summary>
+    public int StartingBullets { get; init; }
     public int GoldToWin { get; init; } = 3;
     public int MinPlayers { get; init; } = 2;
     public int MaxPlayers { get; init; } = 8;

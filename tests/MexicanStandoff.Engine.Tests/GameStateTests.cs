@@ -21,6 +21,15 @@ public class GameStateTests
     }
 
     [Fact]
+    public void New_StartingBullets_AppliedAndCappedAtGunSize()
+    {
+        var parameters = GameParameters.Default with { StartingBullets = 5, MaxBullets = 2 };
+        var state = GameState.New(parameters, FourPlayers);
+
+        Assert.All(state.Players, p => Assert.Equal(2, p.Bullets));
+    }
+
+    [Fact]
     public void New_TooFewPlayers_Throws() =>
         Assert.Throws<ArgumentException>(() => GameState.New(GameParameters.Default, [("a", "Anna")]));
 
