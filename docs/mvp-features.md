@@ -16,7 +16,7 @@ in MVP.)
 ### 2. Core gameplay (engine)
 - [x] Full rules per [game-design.md](game-design.md): simultaneous-volley resolution, strictly-alone chests, loot-on-elimination with instant win.
 - [x] Final Duel (programmed 3-action sequences) at 2 players.
-- [ ] Selection timer with auto-Dodge on timeout. *(server concern — the engine is clock-free)*
+- [x] Selection timer with auto-Dodge on timeout (server-side, configurable via `Game:SelectionTimerSeconds`).
 - [x] All parameters injected via config (so simulation and live game share the engine) — `GameParameters`.
 
 ### 3. Player page (phone)
@@ -45,7 +45,7 @@ in MVP.)
 
 ### 8. Tests & infra
 - [x] Engine unit tests (xUnit) covering every rule and edge case in the spec.
-- [ ] Integration tests driving full games through the SignalR hub in-process.
+- [x] Integration tests driving full games through the SignalR hub in-process.
 - [ ] Bicep for the Web App; GitHub Actions deploy.
 
 ## v2 backlog (explicitly out of MVP)
@@ -63,8 +63,8 @@ in MVP.)
 
 1. **Engine + unit tests** — the rules spec above, pure C#. ✅ done
 2. **Simulation harness** — validate the game is actually fun/quick on paper; lock parameters. ✅ done
-3. **Server + SignalR hub + integration tests** — lobby, rounds, reveal broadcast. ⬅ next
-4. **Player page** — join → play → reveal loop (functional, minimal styling).
+3. **Server + SignalR hub + integration tests** — lobby, rounds, reveal broadcast. ✅ done
+4. **Player page** — join → play → reveal loop (functional, minimal styling). ⬅ next
 5. **Monitor page** — reuse the reveal renderer at TV size.
 6. **Drama pass** — animations, sound, winner ceremony.
 7. **Bicep + CI/CD** — deploy, play at an actual party, iterate.
