@@ -14,10 +14,10 @@ in MVP.)
 - [ ] Reconnect: player token in `localStorage` restores your seat after refresh/drop.
 
 ### 2. Core gameplay (engine)
-- [ ] Full rules per [game-design.md](game-design.md): simultaneous-volley resolution, strictly-alone chests, loot-on-elimination with instant win.
-- [ ] Final Duel (programmed 3-action sequences) at 2 players.
-- [ ] Selection timer with auto-Dodge on timeout.
-- [ ] All parameters injected via config (so simulation and live game share the engine).
+- [x] Full rules per [game-design.md](game-design.md): simultaneous-volley resolution, strictly-alone chests, loot-on-elimination with instant win.
+- [x] Final Duel (programmed 3-action sequences) at 2 players.
+- [ ] Selection timer with auto-Dodge on timeout. *(server concern — the engine is clock-free)*
+- [x] All parameters injected via config (so simulation and live game share the engine) — `GameParameters`.
 
 ### 3. Player page (phone)
 - [ ] Action cards with target pickers (player / chest); illegal cards disabled.
@@ -44,7 +44,7 @@ in MVP.)
 - [ ] Report: game length distribution, win rate per strategy, stalemate frequency → pick MVP defaults.
 
 ### 8. Tests & infra
-- [ ] Engine unit tests (xUnit) covering every rule and edge case in the spec.
+- [x] Engine unit tests (xUnit) covering every rule and edge case in the spec.
 - [ ] Integration tests driving full games through the SignalR hub in-process.
 - [ ] Bicep for the Web App; GitHub Actions deploy.
 
@@ -61,8 +61,8 @@ in MVP.)
 
 ## Suggested build order
 
-1. **Engine + unit tests** — the rules spec above, pure C#.
-2. **Simulation harness** — validate the game is actually fun/quick on paper; lock parameters.
+1. **Engine + unit tests** — the rules spec above, pure C#. ✅ done
+2. **Simulation harness** — validate the game is actually fun/quick on paper; lock parameters. ⬅ next
 3. **Server + SignalR hub + integration tests** — lobby, rounds, reveal broadcast.
 4. **Player page** — join → play → reveal loop (functional, minimal styling).
 5. **Monitor page** — reuse the reveal renderer at TV size.

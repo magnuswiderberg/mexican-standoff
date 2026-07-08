@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MexicanStandoff.Engine/MexicanStandoff.Engine.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MexicanStandoff.Engine.Tests/MexicanStandoff.Engine.Tests.csproj" />
+  </Folder>
+</Solution>
