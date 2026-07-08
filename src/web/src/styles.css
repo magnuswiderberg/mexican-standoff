@@ -1,0 +1,647 @@
+/* Mexican Standoff — dark saloon theme, mobile-first, .tv scales up for the monitor. */
+
+:root {
+  --bg: #171310;
+  --bg-raised: #241d17;
+  --bg-card: #2e251d;
+  --line: #4a3b2c;
+  --ink: #f5ead6;
+  --ink-dim: #b3a48c;
+  --accent: #e0a83c;
+  --accent-ink: #241a06;
+  --danger: #d4543c;
+  --good: #7fb069;
+  --dodge: #6fa8dc;
+  font-size: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: radial-gradient(circle at 50% -20%, #2b2118 0%, var(--bg) 60%);
+  color: var(--ink);
+  font-family: Georgia, 'Times New Roman', serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: 10px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+input {
+  font: inherit;
+  color: var(--ink);
+  background: var(--bg-raised);
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  width: 100%;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+h1,
+h2 {
+  margin: 0.2em 0;
+}
+
+.page {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 1rem 1rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.page.center {
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  text-align: center;
+}
+
+/* ---- TV / monitor scaling -------------------------------------------- */
+
+.page.tv {
+  max-width: 72rem;
+  font-size: 1.35rem;
+  padding-top: 2rem;
+}
+
+.page.tv .board {
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.page.tv .caption {
+  font-size: 2.6rem;
+  min-height: 7rem;
+}
+
+.page.tv .winner-banner {
+  font-size: 3.2rem;
+}
+
+/* ---- shared bits ------------------------------------------------------ */
+
+.logo {
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.tagline {
+  text-align: center;
+  color: var(--ink-dim);
+  margin-top: 0;
+}
+
+.code {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  letter-spacing: 0.25em;
+  color: var(--accent);
+}
+
+.code-big {
+  font-size: 2.4rem;
+  text-align: center;
+}
+
+.hint {
+  color: var(--ink-dim);
+  margin: 0.2rem 0;
+}
+
+.error {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  border: 1px solid var(--danger);
+  color: #f3b0a2;
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: bold;
+  padding: 0.85rem 1.4rem;
+  font-size: 1.05rem;
+}
+
+.secondary {
+  background: var(--bg-card);
+  color: var(--ink);
+  border: 2px solid var(--line);
+  padding: 0.8rem 1.3rem;
+}
+
+.you-badge {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 6px;
+  font-size: 0.65em;
+  padding: 0.1em 0.45em;
+  margin-left: 0.5em;
+  vertical-align: middle;
+  font-weight: bold;
+}
+
+.countdown {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 1.2em;
+  color: var(--ink-dim);
+}
+
+.countdown-urgent {
+  color: var(--danger);
+  animation: pulse 1s infinite;
+}
+
+.round-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  font-size: 1.15em;
+  font-weight: bold;
+}
+
+/* ---- home & lobby ------------------------------------------------------ */
+
+.home {
+  padding-top: 14vh;
+}
+
+.join-form {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.join-form input {
+  text-align: center;
+  letter-spacing: 0.3em;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.join-form-page {
+  flex-direction: column;
+  padding-top: 10vh;
+}
+
+.or {
+  text-align: center;
+  color: var(--ink-dim);
+}
+
+.lobby-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.lobby-list li {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+}
+
+.monitor-lobby {
+  display: flex;
+  gap: 2.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.qr-panel {
+  background: #f5ead6;
+  border-radius: 14px;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.join-url {
+  color: #241a06;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8em;
+  word-break: break-all;
+}
+
+.lobby-panel {
+  min-width: 18rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+/* ---- board ------------------------------------------------------------- */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.6rem;
+}
+
+.tile {
+  position: relative;
+  background: var(--bg-card);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 0.6rem 0.7rem;
+  transition:
+    transform 0.25s,
+    border-color 0.25s,
+    box-shadow 0.25s,
+    opacity 0.4s;
+}
+
+.tile-name {
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.3rem;
+  font-size: 0.9em;
+}
+
+.pips {
+  letter-spacing: 0.1em;
+}
+
+.pip-empty {
+  opacity: 0.35;
+}
+
+.gold-target {
+  color: var(--ink-dim);
+  font-size: 0.85em;
+}
+
+.tile-action {
+  margin-top: 0.4rem;
+  background: var(--bg-raised);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9em;
+  animation: flip-in 0.4s;
+}
+
+.tile-out {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  color: var(--danger);
+  font-weight: bold;
+  font-size: 0.8em;
+  transform: rotate(12deg);
+  border: 2px solid var(--danger);
+  border-radius: 6px;
+  padding: 0 0.3em;
+}
+
+.tile-dead {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+}
+
+.tile-hit {
+  border-color: var(--danger);
+  animation: shake 0.5s;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--danger) 60%, transparent);
+}
+
+.tile-dodge {
+  border-color: var(--dodge);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--dodge) 45%, transparent);
+}
+
+.tile-shooting {
+  border-color: var(--accent);
+}
+
+.tile-loaded {
+  border-color: var(--good);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--good) 45%, transparent);
+}
+
+.tile-gold {
+  border-color: var(--accent);
+  animation: pop 0.5s;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.tile-cancelled {
+  border-color: var(--danger);
+  border-style: dashed;
+}
+
+.tile-eliminated {
+  animation: shake 0.6s;
+  opacity: 0.45;
+  filter: grayscale(0.8);
+}
+
+.tile-winner {
+  border-color: var(--accent);
+  animation: pop 0.7s;
+  box-shadow: 0 0 26px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.tile-targeted {
+  border-color: var(--danger);
+}
+
+/* ---- reveal ------------------------------------------------------------ */
+
+.reveal-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.caption {
+  min-height: 4.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  animation: rise-in 0.35s;
+}
+
+.caption-shotFired {
+  color: var(--danger);
+}
+
+.caption-chestResolved,
+.caption-gameEnded {
+  color: var(--accent);
+}
+
+.caption-gunLoaded {
+  color: var(--good);
+}
+
+.reveal-progress {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: center;
+}
+
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--line);
+  transition: background 0.3s;
+}
+
+.dot-done {
+  background: var(--accent);
+}
+
+/* ---- action picker ------------------------------------------------------ */
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  padding: 0.7rem 0.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 5.2rem;
+}
+
+.card-icon {
+  font-size: 1.6rem;
+}
+
+.card-label {
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.card-why {
+  font-size: 0.65rem;
+  color: var(--ink-dim);
+}
+
+.card-picked {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-card));
+  transform: translateY(-3px);
+}
+
+.targets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.targets-title {
+  color: var(--ink-dim);
+}
+
+.target {
+  background: var(--bg-raised);
+  border: 2px solid var(--line);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  text-align: left;
+  font-size: 1rem;
+}
+
+.target-picked {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-raised));
+}
+
+.lock-in {
+  position: sticky;
+  bottom: 1rem;
+}
+
+/* ---- duel --------------------------------------------------------------- */
+
+.duel-banner {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  text-align: center;
+}
+
+.sudden-death {
+  color: var(--danger);
+  font-weight: bold;
+  margin-top: 0.3rem;
+}
+
+.duel-step {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.duel-step-no {
+  font-weight: bold;
+  color: var(--accent);
+  width: 1.2rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.duel-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.duel-option {
+  background: var(--bg-card);
+  border: 2px solid var(--line);
+  color: var(--ink);
+  border-radius: 9px;
+  padding: 0.5rem 0.2rem;
+  font-size: 0.85rem;
+}
+
+/* ---- banners ------------------------------------------------------------ */
+
+.waiting-banner,
+.spectator-banner {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.8rem;
+  text-align: center;
+  font-weight: bold;
+}
+
+.winner-banner {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--accent);
+  text-align: center;
+  animation: pop 0.7s;
+}
+
+.locked-status {
+  text-align: center;
+  font-size: 1.1em;
+}
+
+/* ---- animations ---------------------------------------------------------- */
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px) rotate(-1deg);
+  }
+  40% {
+    transform: translateX(6px) rotate(1deg);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes flip-in {
+  from {
+    transform: rotateX(90deg);
+    opacity: 0;
+  }
+  to {
+    transform: rotateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    transform: translateY(0.6rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

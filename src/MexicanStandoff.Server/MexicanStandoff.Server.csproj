@@ -8,6 +8,25 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <SpaRoot>..\web\</SpaRoot>
   </PropertyGroup>
+
+  <!--
+    Publish builds the SPA (vite emits into this project's wwwroot) and adds the
+    fresh files to the publish output; wwwroot is gitignored and dev builds
+    never require Node.
+  -->
+  <Target Name="BuildSpa" AfterTargets="ComputeFilesToPublish">
+    <Exec Command="npm ci" WorkingDirectory="$(SpaRoot)" />
+    <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
+    <ItemGroup>
+      <SpaDistFiles Include="wwwroot\**" />
+      <ResolvedFileToPublish Include="@(SpaDistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
+        <RelativePath>%(SpaDistFiles.Identity)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 
 </Project>

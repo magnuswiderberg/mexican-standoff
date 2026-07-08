@@ -312,6 +312,7 @@ public sealed class GameService(
             state.ChestCount,
             state.Parameters.GoldToWin,
             state.Parameters.MaxBullets,
+            state.Parameters.StartingHp,
             state.Parameters.DuelSequenceLength,
             state.Players
                 .Select(p => new PlayerSnapshot(p.Id, p.Name, p.Hp, p.Bullets, p.Gold, p.IsAlive))

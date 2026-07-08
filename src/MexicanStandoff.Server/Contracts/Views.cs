@@ -11,6 +11,7 @@ public sealed record GameSnapshot(
     int ChestCount,
     int GoldToWin,
     int MaxBullets,
+    int StartingHp,
     int DuelSequenceLength,
     IReadOnlyList<PlayerSnapshot> Players);
 

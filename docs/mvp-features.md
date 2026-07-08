@@ -8,10 +8,10 @@ in MVP.)
 ## MVP feature list
 
 ### 1. Game creation & joining
-- [ ] Create game → 4–5 letter game code + QR code (shown on whichever device created it, typically the Monitor page).
-- [ ] Join via QR/URL/code; pick a name + avatar color.
-- [ ] Lobby: live player list on all devices; host starts the game (2–8 players).
-- [ ] Reconnect: player token in `localStorage` restores your seat after refresh/drop.
+- [x] Create game → 4–5 letter game code + QR code (shown on whichever device created it, typically the Monitor page).
+- [x] Join via QR/URL/code; pick a name (avatar colors pending — part of the drama pass).
+- [x] Lobby: live player list on all devices; host (first player) or Monitor starts the game (2–8 players).
+- [x] Reconnect: player token in `localStorage` restores your seat after refresh/drop.
 
 ### 2. Core gameplay (engine)
 - [x] Full rules per [game-design.md](game-design.md): simultaneous-volley resolution, strictly-alone chests, loot-on-elimination with instant win.
@@ -20,23 +20,23 @@ in MVP.)
 - [x] All parameters injected via config (so simulation and live game share the engine) — `GameParameters`.
 
 ### 3. Player page (phone)
-- [ ] Action cards with target pickers (player / chest); illegal cards disabled.
-- [ ] Own stats always visible: HP, bullets, gold bars.
-- [ ] "Waiting for N players…" state after locking in.
-- [ ] Synchronized round reveal — every phone plays the same reveal animation in lockstep (**phones are the monitor**).
-- [ ] Eliminated → spectator view with reveals + standings, and one-tap join when a rematch starts.
+- [x] Action cards with target pickers (player / chest); illegal cards disabled.
+- [x] Own stats always visible: HP, bullets, gold bars.
+- [x] "Waiting for N players…" state after locking in.
+- [x] Synchronized round reveal — every phone plays the same reveal animation in lockstep (**phones are the monitor**).
+- [x] Eliminated → spectator view with reveals + standings; rematch automatically re-seats everyone.
 
 ### 4. Monitor page (optional big screen)
-- [ ] QR + lobby view, game state between rounds (players, HP, bullets, gold).
-- [ ] Big-screen rendering of the same reveal script the phones play.
-- [ ] Winner ceremony; rematch button.
+- [x] QR + lobby view, game state between rounds (players, HP, bullets, gold).
+- [x] Big-screen rendering of the same reveal script the phones play.
+- [x] Winner ceremony; rematch button.
 
 ### 5. Reveal drama
-- [ ] Staged reveal: cards flip → dodges → shots animate → hits/HP → cancels → loads → chest outcomes → eliminations/loot → win check.
+- [x] Staged reveal: cards flip → dodges → shots animate → hits/HP → cancels → loads → chest outcomes → eliminations/loot → win check.
 - [ ] Sound effects (phones can be muted; the Monitor carries the room).
 
 ### 6. Rematch loop
-- [ ] "Play again" keeps the lobby (everyone already seated, eliminated players included), fresh game state.
+- [x] "Play again" keeps the lobby (everyone already seated, eliminated players included), fresh game state.
 
 ### 7. Simulation harness
 - [x] Console app: bots with distinct strategies (aggressive, greedy/chest-rusher, turtle, random, adaptive).
@@ -64,7 +64,7 @@ in MVP.)
 1. **Engine + unit tests** — the rules spec above, pure C#. ✅ done
 2. **Simulation harness** — validate the game is actually fun/quick on paper; lock parameters. ✅ done
 3. **Server + SignalR hub + integration tests** — lobby, rounds, reveal broadcast. ✅ done
-4. **Player page** — join → play → reveal loop (functional, minimal styling). ⬅ next
-5. **Monitor page** — reuse the reveal renderer at TV size.
-6. **Drama pass** — animations, sound, winner ceremony.
+4. **Player page** — join → play → reveal loop (functional, minimal styling). ✅ done
+5. **Monitor page** — reuse the reveal renderer at TV size. ✅ done
+6. **Drama pass** — animations, sound, winner ceremony. ⬅ next (basic animations exist; sound + avatar colors + polish pending)
 7. **Bicep + CI/CD** — deploy, play at an actual party, iterate.

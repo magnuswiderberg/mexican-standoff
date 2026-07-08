@@ -11,7 +11,11 @@ obj/
 node_modules/
 dist/
 
+# SPA build output (vite builds into the server's wwwroot)
+src/MexicanStandoff.Server/wwwroot/
+
 # Local settings & secrets
 appsettings.*.local.json
 .env
 .env.local
+todos.md
