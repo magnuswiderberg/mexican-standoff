@@ -1,0 +1,17 @@
+# IDE (personal settings)
+.vscode/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# Node / Vite
+node_modules/
+dist/
+
+# Local settings & secrets
+appsettings.*.local.json
+.env
+.env.local
