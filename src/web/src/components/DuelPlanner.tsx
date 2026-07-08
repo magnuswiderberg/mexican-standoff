@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ActionDto, ActionType, GameSnapshot } from '../types'
+import { colorOf } from '../colors'
 
 /**
  * Final Duel: program a full sequence of actions up front. Legality mirrors
@@ -99,7 +100,7 @@ export function DuelPlanner({
   return (
     <div className="picker duel-planner">
       <div className="duel-banner">
-        ⚔️ Final Duel vs <strong>{opponent.name}</strong>
+        ⚔️ Final Duel vs <strong style={{ color: colorOf(opponent.color) }}>{opponent.name}</strong>
         {snapshot.suddenDeath && <div className="sudden-death">☠️ Sudden death — free bullet, no chest!</div>}
       </div>
       <p className="hint">Program all {length} moves, then watch them play out.</p>

@@ -175,6 +175,7 @@ h2 {
 
 .countdown-urgent {
   color: var(--danger);
+  font-size: 1.5em;
   animation: pulse 1s infinite;
 }
 
@@ -272,9 +273,10 @@ h2 {
 }
 
 .tile {
+  --player-color: var(--ink-dim);
   position: relative;
   background: var(--bg-card);
-  border: 2px solid var(--line);
+  border: 2px solid color-mix(in srgb, var(--player-color) 40%, var(--line));
   border-radius: 12px;
   padding: 0.6rem 0.7rem;
   transition:
@@ -286,9 +288,37 @@ h2 {
 
 .tile-name {
   font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.tile-name-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--player-color);
+}
+
+.avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  color: #1c1610;
+  font-weight: bold;
+  font-size: 0.85em;
+  font-family: Georgia, serif;
+  box-shadow: inset 0 -2px 0 rgb(0 0 0 / 25%);
+}
+
+.avatar-big {
+  width: 2.2em;
+  height: 2.2em;
 }
 
 .tile-stats {
@@ -319,7 +349,10 @@ h2 {
   border-radius: 8px;
   padding: 0.25rem 0.5rem;
   font-size: 0.9em;
-  animation: flip-in 0.4s;
+  /* Card flip, staggered per seat so the table "ripples" open. */
+  transform-origin: center bottom;
+  animation: flip-in 0.5s both;
+  animation-delay: calc(var(--i, 0) * 90ms);
 }
 
 .tile-out {
@@ -346,6 +379,16 @@ h2 {
   box-shadow: 0 0 18px color-mix(in srgb, var(--danger) 60%, transparent);
 }
 
+.tile-hit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: var(--danger);
+  pointer-events: none;
+  animation: hp-flash 0.6s both;
+}
+
 .tile-dodge {
   border-color: var(--dodge);
   box-shadow: 0 0 14px color-mix(in srgb, var(--dodge) 45%, transparent);
@@ -353,6 +396,7 @@ h2 {
 
 .tile-shooting {
   border-color: var(--accent);
+  animation: recoil 0.45s;
 }
 
 .tile-loaded {
@@ -372,14 +416,24 @@ h2 {
 }
 
 .tile-eliminated {
-  animation: shake 0.6s;
-  opacity: 0.45;
+  animation: topple 1.1s both;
   filter: grayscale(0.8);
+}
+
+.tile-skull {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.6em;
+  pointer-events: none;
+  animation: stage-pop 1s 0.5s both;
 }
 
 .tile-winner {
   border-color: var(--accent);
-  animation: pop 0.7s;
+  animation: winner-glow 1.4s infinite alternate, pop 0.7s;
   box-shadow: 0 0 26px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
@@ -585,6 +639,218 @@ h2 {
   font-size: 1.1em;
 }
 
+/* ---- floating indicators (−1 HP, +gold) -------------------------------- */
+
+.float {
+  position: absolute;
+  top: -0.4rem;
+  right: 0.4rem;
+  font-weight: bold;
+  font-size: 1.05em;
+  pointer-events: none;
+  animation: float-up 1.6s ease-out both;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 60%);
+  z-index: 4;
+}
+
+.float-hurt {
+  color: #ff8a75;
+}
+
+.float-gold {
+  color: var(--accent);
+}
+
+/* ---- shot tracer --------------------------------------------------------- */
+
+.shot-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.bullet {
+  position: absolute;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin: -0.275rem 0 0 -0.275rem;
+  border-radius: 50%;
+  background: #ffe9b0;
+  box-shadow:
+    0 0 8px 3px color-mix(in srgb, var(--accent) 80%, transparent),
+    0 0 20px 6px color-mix(in srgb, var(--accent) 40%, transparent);
+  animation: bullet-fly 0.32s cubic-bezier(0.2, 0, 0.9, 0.4) both;
+}
+
+.muzzle-flash {
+  position: absolute;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin: -0.8rem 0 0 -0.8rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff3c4 0%, var(--accent) 45%, transparent 70%);
+  animation: muzzle 0.25s ease-out both;
+}
+
+.impact {
+  position: absolute;
+  margin-left: -0.8em;
+  margin-top: -0.8em;
+  font-size: 1.6rem;
+  animation: impact-pop 0.6s 0.3s both;
+}
+
+/* ---- stage icon (chest / elimination / trophy) --------------------------- */
+
+.reveal-board {
+  position: relative;
+}
+
+.stage-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4.5rem;
+  pointer-events: none;
+  z-index: 6;
+  animation: stage-pop 1.4s both;
+  filter: drop-shadow(0 4px 14px rgb(0 0 0 / 55%));
+}
+
+.page.tv .stage-icon {
+  font-size: 7rem;
+}
+
+/* ---- confetti ------------------------------------------------------------ */
+
+.confetti {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -1rem;
+  border-radius: 2px;
+  opacity: 0.9;
+  animation: confetti-fall linear infinite both;
+}
+
+/* ---- color swatches (join form) ------------------------------------------ */
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.45rem;
+}
+
+.swatch {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  color: #1c1610;
+  font-weight: bold;
+  font-size: 1rem;
+  padding: 0;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.swatch-picked {
+  border-color: var(--ink);
+  transform: scale(1.15);
+}
+
+.swatch-taken {
+  opacity: 0.35;
+}
+
+.lobby-player {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  animation: rise-in 0.3s;
+}
+
+/* ---- waiting states ------------------------------------------------------- */
+
+.center-text {
+  text-align: center;
+}
+
+.ellipsis::after {
+  content: '…';
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  animation: ellipsis 1.5s steps(4, jump-none) infinite;
+}
+
+.lock-progress {
+  position: relative;
+  height: 1.9rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.lock-progress-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in srgb, var(--accent) 45%, var(--bg-raised));
+  transition: width 0.4s;
+}
+
+.lock-progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85em;
+  font-weight: bold;
+}
+
+/* ---- sound toggle & rematch countdown ------------------------------------ */
+
+.sound-toggle {
+  position: fixed;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 40;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  width: 2.4rem;
+  height: 2.4rem;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rematch-countdown {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.winner-banner-tv {
+  animation: pop 0.7s, winner-glow-text 1.2s infinite alternate;
+}
+
+.caption-name {
+  font-weight: bold;
+}
+
 /* ---- animations ---------------------------------------------------------- */
 
 @keyframes shake {
@@ -643,5 +909,151 @@ h2 {
   to {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+
+@keyframes recoil {
+  0% {
+    transform: translate(0, 0) rotate(0);
+  }
+  25% {
+    transform: translate(-4px, -3px) rotate(-2deg);
+  }
+  60% {
+    transform: translate(2px, 1px) rotate(0.5deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0);
+  }
+}
+
+@keyframes hp-flash {
+  0% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes topple {
+  0% {
+    transform: rotate(0) translateY(0);
+    opacity: 1;
+  }
+  30% {
+    transform: rotate(-3deg) translateY(0);
+  }
+  100% {
+    transform: rotate(4deg) translateY(0.4rem);
+    opacity: 0.45;
+  }
+}
+
+@keyframes winner-glow {
+  from {
+    box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  to {
+    box-shadow: 0 0 34px color-mix(in srgb, var(--accent) 85%, transparent);
+  }
+}
+
+@keyframes winner-glow-text {
+  from {
+    text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  to {
+    text-shadow: 0 0 30px color-mix(in srgb, var(--accent) 90%, transparent);
+  }
+}
+
+@keyframes float-up {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-2.2rem);
+    opacity: 0;
+  }
+}
+
+@keyframes bullet-fly {
+  from {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--dx), var(--dy));
+    opacity: 1;
+  }
+}
+
+@keyframes muzzle {
+  from {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+@keyframes impact-pop {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(1.4);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes stage-pop {
+  0% {
+    transform: scale(0.2) rotate(-8deg);
+    opacity: 0;
+  }
+  35% {
+    transform: scale(1.15) rotate(2deg);
+    opacity: 1;
+  }
+  55% {
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.05);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translate(0, -5vh) rotate(0);
+  }
+  100% {
+    transform: translate(var(--sway, 0), 105vh) rotate(var(--spin, 540deg));
+  }
+}
+
+@keyframes ellipsis {
+  0% {
+    width: 0;
+  }
+  100% {
+    width: 1.2em;
   }
 }

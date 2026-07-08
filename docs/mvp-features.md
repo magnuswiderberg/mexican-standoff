@@ -9,7 +9,7 @@ in MVP.)
 
 ### 1. Game creation & joining
 - [x] Create game → 4–5 letter game code + QR code (shown on whichever device created it, typically the Monitor page).
-- [x] Join via QR/URL/code; pick a name (avatar colors pending — part of the drama pass).
+- [x] Join via QR/URL/code; pick a name and an avatar color (8-color palette, taken colors greyed out live; the server dedupes).
 - [x] Lobby: live player list on all devices; host (first player) or Monitor starts the game (2–8 players).
 - [x] Reconnect: player token in `localStorage` restores your seat after refresh/drop.
 
@@ -32,8 +32,8 @@ in MVP.)
 - [x] Winner ceremony; rematch button.
 
 ### 5. Reveal drama
-- [x] Staged reveal: cards flip → dodges → shots animate → hits/HP → cancels → loads → chest outcomes → eliminations/loot → win check.
-- [ ] Sound effects (phones can be muted; the Monitor carries the room).
+- [x] Staged reveal: cards flip → dodges → shots animate (tracer + recoil + HP flash) → hits/HP → cancels → loads → chest outcomes → eliminations/loot → win check with confetti ceremony and a monitor rematch countdown.
+- [x] Sound effects — WebAudio-synthesized (no assets): flip, gunshot, dodge whoosh, load click, gold bells, standoff sting, elimination, winner fanfare, countdown ticks. Monitor defaults on, phones default muted; both have a toggle.
 
 ### 6. Rematch loop
 - [x] "Play again" keeps the lobby (everyone already seated, eliminated players included), fresh game state.
@@ -66,5 +66,5 @@ in MVP.)
 3. **Server + SignalR hub + integration tests** — lobby, rounds, reveal broadcast. ✅ done
 4. **Player page** — join → play → reveal loop (functional, minimal styling). ✅ done
 5. **Monitor page** — reuse the reveal renderer at TV size. ✅ done
-6. **Drama pass** — animations, sound, winner ceremony. ⬅ next (basic animations exist; sound + avatar colors + polish pending)
-7. **Bicep + CI/CD** — deploy, play at an actual party, iterate.
+6. **Drama pass** — animations, sound, winner ceremony. ✅ done
+7. **Bicep + CI/CD** — deploy, play at an actual party, iterate. ⬅ next

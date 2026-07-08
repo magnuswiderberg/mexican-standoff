@@ -21,7 +21,7 @@ public sealed class GameService(
 
     public string CreateGame() => store.Create().Code;
 
-    public async Task<JoinResult> JoinAsync(string code, string name)
+    public async Task<JoinResult> JoinAsync(string code, string name, string? preferredColor = null)
     {
         var session = Require(code);
         JoinResult result;
@@ -43,6 +43,7 @@ public sealed class GameService(
                 Id = $"p{session.Players.Count + 1}",
                 Token = Guid.NewGuid().ToString("N"),
                 Name = name,
+                Color = AvatarColors.Assign(preferredColor, session.Players.Select(p => p.Color)),
             };
             session.Players.Add(player);
             result = new JoinResult(player.Id, player.Token, LobbyOf(session));
@@ -297,12 +298,13 @@ public sealed class GameService(
 
     private static LobbyView LobbyOf(GameSession session) => new(
         session.Code,
-        session.Players.Select(p => new LobbyPlayer(p.Id, p.Name)).ToList(),
+        session.Players.Select(p => new LobbyPlayer(p.Id, p.Name, p.Color)).ToList(),
         session.Players.Count >= Parameters.MinPlayers && session.Phase == GamePhase.Lobby);
 
     private static GameSnapshot SnapshotOf(GameSession session)
     {
         var state = session.State!;
+        var colors = session.Players.ToDictionary(p => p.Id, p => p.Color);
         return new GameSnapshot(
             session.Code,
             session.Phase.ToString(),
@@ -315,7 +317,7 @@ public sealed class GameService(
             state.Parameters.StartingHp,
             state.Parameters.DuelSequenceLength,
             state.Players
-                .Select(p => new PlayerSnapshot(p.Id, p.Name, p.Hp, p.Bullets, p.Gold, p.IsAlive))
+                .Select(p => new PlayerSnapshot(p.Id, p.Name, colors.GetValueOrDefault(p.Id, ""), p.Hp, p.Bullets, p.Gold, p.IsAlive))
                 .ToList());
     }
 }

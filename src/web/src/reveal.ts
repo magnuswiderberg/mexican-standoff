@@ -10,6 +10,8 @@ import type { ActionDto, GameSnapshot, RevealStepDto } from './types'
 export interface DisplayPlayer {
   id: string
   name: string
+  /** Avatar palette key (see colors.ts). */
+  color: string
   hp: number
   bullets: number
   gold: number
@@ -24,14 +26,22 @@ export interface DisplayPlayer {
     cancelled?: boolean
     loaded?: boolean
     gotGold?: boolean
+    /** Gold gained on this step (drives the floating "+n" indicator). */
+    goldGained?: number
     eliminated?: boolean
     winner?: boolean
   }
 }
 
+/** One run of caption text; parts with a playerId render in that player's color. */
+export interface CaptionPart {
+  text: string
+  playerId?: string
+}
+
 export interface DisplayState {
   players: DisplayPlayer[]
-  caption: string
+  caption: CaptionPart[]
   /** Set once a gameEnded step has played. */
   winnerIds: string[] | null
 }
@@ -41,6 +51,7 @@ export function initialDisplayState(prev: GameSnapshot): DisplayState {
     players: prev.players.map((p) => ({
       id: p.id,
       name: p.name,
+      color: p.color,
       hp: p.hp,
       bullets: p.bullets,
       gold: p.gold,
@@ -48,7 +59,7 @@ export function initialDisplayState(prev: GameSnapshot): DisplayState {
       revealedAction: null,
       flags: {},
     })),
-    caption: '',
+    caption: [],
     winnerIds: null,
   }
 }
@@ -79,14 +90,14 @@ export function stepDuration(step: RevealStepDto): number {
   }
 }
 
-function describeAction(action: ActionDto, name: (id: string) => string): string {
+function describeAction(action: ActionDto): string {
   switch (action.type) {
     case 'dodge':
       return 'Dodge'
     case 'load':
       return 'Load'
     case 'attack':
-      return `Attack ${name(action.targetId ?? '?')}`
+      return 'Attack'
     case 'chest':
       return `Chest ${(action.chestIndex ?? 0) + 1}`
   }
@@ -96,8 +107,15 @@ function describeAction(action: ActionDto, name: (id: string) => string): string
 export function applyStep(state: DisplayState, step: RevealStepDto): DisplayState {
   const players = state.players.map((p) => ({ ...p, flags: {} as DisplayPlayer['flags'] }))
   const byId = new Map(players.map((p) => [p.id, p]))
-  const name = (id: string) => byId.get(id)?.name ?? '?'
-  let caption = ''
+  const t = (text: string): CaptionPart => ({ text })
+  const who = (id: string | null | undefined): CaptionPart => ({
+    text: byId.get(id ?? '')?.name ?? '?',
+    playerId: id ?? undefined,
+  })
+  /** Interleaves player-name parts with " & ". */
+  const all = (ids: string[]): CaptionPart[] =>
+    ids.flatMap((id, i) => (i === 0 ? [who(id)] : [t(' & '), who(id)]))
+  let caption: CaptionPart[] = []
   let winnerIds = state.winnerIds
 
   switch (step.type) {
@@ -109,7 +127,7 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
         p.revealedAction = a.action
         if (a.action.type === 'dodge') p.flags.dodging = true
       }
-      caption = 'Cards on the table!'
+      caption = [t('Cards on the table!')]
       break
     }
     case 'shotFired': {
@@ -122,17 +140,17 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
       if (step.hit && target) {
         target.hp = Math.max(0, target.hp - 1)
         target.flags.hit = true
-        caption = `${name(step.shooterId!)} shoots ${name(step.targetId!)} — hit!`
+        caption = [who(step.shooterId), t(' shoots '), who(step.targetId), t(' — hit!')]
       } else {
         if (target) target.flags.dodging = true
-        caption = `${name(step.shooterId!)} shoots ${name(step.targetId!)} — dodged!`
+        caption = [who(step.shooterId), t(' shoots '), who(step.targetId), t(' — dodged!')]
       }
       break
     }
     case 'actionCancelled': {
       const p = byId.get(step.playerId ?? '')
       if (p) p.flags.cancelled = true
-      caption = `${name(step.playerId!)} was hit — ${describeAction(step.action!, name)} is cancelled!`
+      caption = [who(step.playerId), t(` was hit — ${describeAction(step.action!)} is cancelled!`)]
       break
     }
     case 'gunLoaded': {
@@ -141,7 +159,7 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
         p.bullets = step.bulletsNow ?? p.bullets + 1
         p.flags.loaded = true
       }
-      caption = `${name(step.playerId!)} loads a bullet.`
+      caption = [who(step.playerId), t(' loads a bullet.')]
       break
     }
     case 'suddenDeathBullet': {
@@ -150,7 +168,7 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
         p.bullets = step.bulletsNow ?? p.bullets + 1
         p.flags.loaded = true
       }
-      caption = `Sudden death — ${name(step.playerId!)} gets a free bullet!`
+      caption = [t('Sudden death — '), who(step.playerId), t(' gets a free bullet!')]
       break
     }
     case 'chestResolved': {
@@ -161,12 +179,17 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
         if (p) {
           p.gold += 1
           p.flags.gotGold = true
+          p.flags.goldGained = 1
         }
-        caption = `${name(step.chestWinnerId)} grabs a gold bar from ${chest}!`
+        caption = [who(step.chestWinnerId), t(` grabs a gold bar from ${chest}!`)]
       } else if (contenders.length > 1) {
-        caption = `${chest}: standoff between ${contenders.map(name).join(' & ')} — nobody gets gold!`
+        caption = [
+          t(`${chest}: standoff between `),
+          ...all(contenders),
+          t(' — nobody gets gold!'),
+        ]
       } else {
-        caption = `${chest} stays shut.`
+        caption = [t(`${chest} stays shut.`)]
       }
       break
     }
@@ -184,18 +207,19 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
         if (looter && share > 0) {
           looter.gold += share
           looter.flags.gotGold = true
+          looter.flags.goldGained = share
         }
       }
       caption =
         share > 0
-          ? `${name(step.playerId!)} is down! ${looters.map(name).join(' & ')} loot ${share} gold each.`
-          : `${name(step.playerId!)} is down!`
+          ? [who(step.playerId), t(' is down! '), ...all(looters), t(` loot ${share} gold each.`)]
+          : [who(step.playerId), t(' is down!')]
       break
     }
     case 'actionFizzled': {
       const p = byId.get(step.playerId ?? '')
       if (p) p.flags.cancelled = true
-      caption = `${name(step.playerId!)}'s ${describeAction(step.action!, name)} fizzles into a Dodge.`
+      caption = [who(step.playerId), t(`'s ${describeAction(step.action!)} fizzles into a Dodge.`)]
       break
     }
     case 'gameEnded': {
@@ -204,13 +228,13 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
         const p = byId.get(id)
         if (p) p.flags.winner = true
       }
-      const names = winnerIds.map(name).join(' & ')
+      const names = all(winnerIds)
       caption =
         step.winReason === 'LastStanding'
-          ? `${names} is the last one standing!`
+          ? [...names, t(winnerIds.length > 1 ? ' are the last standing!' : ' is the last one standing!')]
           : step.winReason === 'MutualDestruction'
-            ? `Mutual destruction — ${names} share the victory!`
-            : `${names} wins with the gold!`
+            ? [t('Mutual destruction — '), ...names, t(' share the victory!')]
+            : [...names, t(winnerIds.length > 1 ? ' win with the gold!' : ' wins with the gold!')]
       break
     }
   }

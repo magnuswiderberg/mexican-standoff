@@ -62,7 +62,7 @@ const initial: State = {
 type Msg =
   | { type: 'fatal'; error: string }
   | { type: 'actionError'; error: string | null }
-  | { type: 'needJoin' }
+  | { type: 'needJoin'; lobby: LobbyView | null }
   | { type: 'joined'; playerId: string; lobby: LobbyView }
   | { type: 'hydrate'; view: GameView }
   | { type: 'lobbyUpdated'; lobby: LobbyView }
@@ -79,7 +79,7 @@ function reduce(state: State, msg: Msg): State {
     case 'actionError':
       return { ...state, actionError: msg.error }
     case 'needJoin':
-      return { ...state, phase: 'joining' }
+      return { ...state, phase: 'joining', lobby: msg.lobby ?? state.lobby }
     case 'joined':
       return { ...state, phase: 'lobby', playerId: msg.playerId, lobby: msg.lobby }
     case 'hydrate': {
@@ -143,7 +143,7 @@ function reduce(state: State, msg: Msg): State {
 }
 
 export interface GameApi extends State {
-  join(name: string): Promise<void>
+  join(name: string, color: string | null): Promise<void>
   start(): Promise<void>
   submitAction(action: ActionDto): Promise<void>
   submitSequence(sequence: ActionDto[]): Promise<void>
@@ -180,8 +180,13 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
       if (!disposed) dispatch({ type: 'lobbyUpdated', lobby })
     })
 
+    // A player without a seat is only watching the lobby from the join form —
+    // game events must not yank the form away (joining then fails server-side
+    // with "already started", which the form surfaces).
+    const seated = () => mode === 'monitor' || tokenRef.current !== null
+
     conn.on('RoundStarted', (view: RoundStartedView) => {
-      if (disposed) return
+      if (disposed || !seated()) return
       snapshotRef.current = view.snapshot
       queueRef.current = []
       playingRef.current = false
@@ -193,7 +198,7 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
     })
 
     conn.on('RoundResolved', (view: RoundResolvedView) => {
-      if (disposed) return
+      if (disposed || !seated()) return
       const prev = snapshotRef.current ?? view.snapshot
       snapshotRef.current = view.snapshot
       const job: RevealJob = { steps: view.reveal, prev, view }
@@ -214,9 +219,20 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
         return
       }
 
+      // No seat yet: watch the game so the join form sees the live lobby
+      // (names + taken avatar colors) while the player picks.
+      async function watchForJoin() {
+        try {
+          const view = await conn.invoke<GameView>('WatchGame', code)
+          if (!disposed) dispatch({ type: 'needJoin', lobby: view.lobby })
+        } catch (e) {
+          if (!disposed) dispatch({ type: 'fatal', error: friendlyError(e) })
+        }
+      }
+
       const token = tokenRef.current ?? getSeat(code)?.token
       if (!token) {
-        dispatch({ type: 'needJoin' })
+        await watchForJoin()
         return
       }
       try {
@@ -230,7 +246,7 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
         if (disposed) return
         tokenRef.current = null
         clearSeat(code)
-        dispatch({ type: 'needJoin' })
+        await watchForJoin()
       }
     }
 
@@ -264,9 +280,9 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
   )
 
   const join = useCallback(
-    async (name: string) => {
+    async (name: string, color: string | null) => {
       try {
-        const result = (await invoke('JoinGame', code, name)) as JoinResult
+        const result = (await invoke('JoinGame', code, name, color)) as JoinResult
         tokenRef.current = result.playerToken
         saveSeat(code, { playerId: result.playerId, token: result.playerToken, name })
         dispatch({ type: 'joined', playerId: result.playerId, lobby: result.lobby })

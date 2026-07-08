@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ActionDto, ActionType, GameSnapshot } from '../types'
+import { Avatar } from './PlayerBoard'
 
 interface CardSpec {
   type: ActionType
@@ -119,7 +120,7 @@ export function ActionPicker({
               className={`target ${targetId === p.id ? 'target-picked' : ''}`}
               onClick={() => setTargetId(p.id)}
             >
-              🎯 {p.name}
+              🎯 <Avatar color={p.color} name={p.name} /> {p.name}
             </button>
           ))}
         </div>
