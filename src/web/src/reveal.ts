@@ -10,8 +10,8 @@ import type { ActionDto, GameSnapshot, RevealStepDto } from './types'
 export interface DisplayPlayer {
   id: string
   name: string
-  /** Avatar palette key (see colors.ts). */
-  color: string
+  /** Avatar key (see avatars.ts). */
+  avatar: string
   hp: number
   bullets: number
   gold: number
@@ -51,7 +51,7 @@ export function initialDisplayState(prev: GameSnapshot): DisplayState {
     players: prev.players.map((p) => ({
       id: p.id,
       name: p.name,
-      color: p.color,
+      avatar: p.avatar,
       hp: p.hp,
       bullets: p.bullets,
       gold: p.gold,

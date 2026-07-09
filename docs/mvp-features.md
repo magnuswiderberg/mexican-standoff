@@ -9,7 +9,7 @@ in MVP.)
 
 ### 1. Game creation & joining
 - [x] Create game → 4–5 letter game code + QR code (shown on whichever device created it, typically the Monitor page).
-- [x] Join via QR/URL/code; pick a name and an avatar color (8-color palette, taken colors greyed out live; the server dedupes).
+- [x] Join via QR/URL/code; pick a name and an avatar (10 character portraits with accent colors, taken ones greyed out live; the server dedupes).
 - [x] Lobby: live player list on all devices; host (first player) or Monitor starts the game (2–8 players).
 - [x] Reconnect: player token in `localStorage` restores your seat after refresh/drop.
 

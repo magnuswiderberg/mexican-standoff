@@ -14,8 +14,8 @@ public sealed class SessionPlayer
     public required string Id { get; init; }
     public required string Token { get; init; }
     public required string Name { get; init; }
-    /// <summary>Avatar color key from <see cref="Games.AvatarColors.All"/>.</summary>
-    public required string Color { get; init; }
+    /// <summary>Avatar key from <see cref="Games.Avatars.All"/>.</summary>
+    public required string Avatar { get; init; }
 }
 
 /// <summary>

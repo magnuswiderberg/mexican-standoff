@@ -18,11 +18,11 @@ public sealed class GameHub(GameService games) : Hub<IGameClient>
         return code;
     }
 
-    public async Task<JoinResult> JoinGame(string gameCode, string playerName, string? preferredColor = null)
+    public async Task<JoinResult> JoinGame(string gameCode, string playerName, string? preferredAvatar = null)
     {
         var code = Normalize(gameCode);
         await Groups.AddToGroupAsync(Context.ConnectionId, code);
-        return await games.JoinAsync(code, playerName, preferredColor);
+        return await games.JoinAsync(code, playerName, preferredAvatar);
     }
 
     /// <summary>Monitor page: subscribe to a game without being a player.</summary>

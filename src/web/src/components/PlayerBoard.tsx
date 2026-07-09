@@ -2,12 +2,12 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { ActionDto } from '../types'
 import type { DisplayPlayer } from '../reveal'
-import { colorOf } from '../colors'
+import { accentOf, avatarOf, avatarUrl } from '../avatars'
 
 export interface BoardPlayer {
   id: string
   name: string
-  color: string
+  avatar: string
   hp: number
   bullets: number
   gold: number
@@ -37,14 +37,21 @@ function actionLabel(action: ActionDto): string {
   }
 }
 
-export function Avatar({ color, name, size }: { color: string; name: string; size?: 'big' }) {
+export function Avatar({ avatar, name, size }: { avatar: string; name: string; size?: 'big' | 'hero' }) {
+  const cls = `avatar ${size === 'big' ? 'avatar-big' : size === 'hero' ? 'avatar-hero' : ''}`
+  const spec = avatarOf(avatar)
+  if (!spec) {
+    // Unknown key (shouldn't happen): fall back to an initial disc.
+    return <span className={`${cls} avatar-fallback`}>{(name.trim()[0] ?? '?').toUpperCase()}</span>
+  }
   return (
-    <span
-      className={`avatar ${size === 'big' ? 'avatar-big' : ''}`}
-      style={{ background: colorOf(color) }}
-    >
-      {(name.trim()[0] ?? '?').toUpperCase()}
-    </span>
+    <img
+      className={cls}
+      src={avatarUrl(avatar)}
+      alt={spec.persona}
+      title={`${spec.name} — ${spec.persona}`}
+      style={{ boxShadow: `0 0 0 2px ${spec.accent}` }}
+    />
   )
 }
 
@@ -139,14 +146,14 @@ export function PlayerBoard({
           <div
             key={p.id}
             className={classes}
-            style={{ '--player-color': colorOf(p.color), '--i': i } as CSSProperties}
+            style={{ '--player-color': accentOf(p.avatar), '--i': i } as CSSProperties}
             ref={(el) => {
               if (el) tileRefs.current.set(p.id, el)
               else tileRefs.current.delete(p.id)
             }}
           >
             <div className="tile-name">
-              <Avatar color={p.color} name={p.name} />
+              <Avatar avatar={p.avatar} name={p.name} />
               <span className="tile-name-text">{p.name}</span>
               {p.id === meId && <span className="you-badge">you</span>}
             </div>

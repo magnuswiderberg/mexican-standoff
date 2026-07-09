@@ -7,7 +7,7 @@ import { PlayerBoard, Avatar } from '../components/PlayerBoard'
 import { RevealStage } from '../components/RevealStage'
 import { SoundToggle } from '../components/SoundToggle'
 import { Confetti } from '../components/Confetti'
-import { colorOf } from '../colors'
+import { accentOf } from '../avatars'
 import { navigate } from '../router'
 
 const REMATCH_SECONDS = 30
@@ -102,7 +102,7 @@ export function MonitorPage({ code }: { code: string }) {
                 <ul className="lobby-list">
                   {game.lobby?.players.map((p) => (
                     <li key={p.id} className="lobby-player">
-                      <Avatar color={p.color} name={p.name} />
+                      <Avatar avatar={p.avatar} name={p.name} />
                       <span>{p.name}</span>
                     </li>
                   ))}
@@ -173,12 +173,15 @@ export function MonitorPage({ code }: { code: string }) {
         return (
           <div className="page tv center">
             <Confetti pieces={140} />
+            <div className="winner-portraits">
+              {winners?.map((p) => <Avatar key={p.id} avatar={p.avatar} name={p.name} size="hero" />)}
+            </div>
             <div className="winner-banner winner-banner-tv">
               🏆{' '}
               {winners?.map((p, i) => (
                 <span key={p.id}>
                   {i > 0 && ' & '}
-                  <span style={{ color: colorOf(p.color) }}>{p.name}</span>
+                  <span style={{ color: accentOf(p.avatar) }}>{p.name}</span>
                 </span>
               ))}{' '}
               {(winners?.length ?? 0) > 1 ? 'win!' : 'wins!'}

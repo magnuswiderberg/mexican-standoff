@@ -303,22 +303,41 @@ h2 {
 
 .avatar {
   flex-shrink: 0;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  object-fit: cover;
+  display: inline-block;
+  vertical-align: middle;
+  background: var(--bg-raised);
+}
+
+.avatar-fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.5em;
-  height: 1.5em;
-  border-radius: 50%;
-  color: #1c1610;
+  color: var(--ink-dim);
   font-weight: bold;
   font-size: 0.85em;
   font-family: Georgia, serif;
-  box-shadow: inset 0 -2px 0 rgb(0 0 0 / 25%);
 }
 
 .avatar-big {
-  width: 2.2em;
-  height: 2.2em;
+  width: 2.4em;
+  height: 2.4em;
+}
+
+.avatar-hero {
+  width: 7rem;
+  height: 7rem;
+  border-radius: 18px;
+  animation: pop 0.7s;
+}
+
+.winner-portraits {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
 }
 
 .tile-stats {
@@ -742,32 +761,58 @@ h2 {
   animation: confetti-fall linear infinite both;
 }
 
-/* ---- color swatches (join form) ------------------------------------------ */
+/* ---- avatar picker (join form) ------------------------------------------- */
 
-.swatches {
+.avatar-grid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 0.45rem;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
 }
 
-.swatch {
+.avatar-pick {
+  position: relative;
   aspect-ratio: 1;
-  border-radius: 50%;
-  border: 3px solid transparent;
-  color: #1c1610;
-  font-weight: bold;
-  font-size: 1rem;
   padding: 0;
+  border-radius: 14px;
+  border: 3px solid transparent;
+  background: var(--bg-card);
+  overflow: hidden;
   transition: transform 0.15s, border-color 0.15s;
 }
 
-.swatch-picked {
-  border-color: var(--ink);
-  transform: scale(1.15);
+.avatar-pick img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.swatch-taken {
-  opacity: 0.35;
+.avatar-pick-selected {
+  border-color: var(--accent);
+  transform: scale(1.08);
+}
+
+.avatar-pick-taken img {
+  opacity: 0.3;
+  filter: grayscale(0.8);
+}
+
+.avatar-pick-x {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  color: var(--danger);
+  font-weight: bold;
+}
+
+.persona {
+  margin: 0;
+  text-align: center;
+  font-weight: bold;
+  font-style: italic;
 }
 
 .lobby-player {

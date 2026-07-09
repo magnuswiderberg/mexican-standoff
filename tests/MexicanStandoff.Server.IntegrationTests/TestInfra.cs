@@ -55,8 +55,8 @@ public sealed class GameClient : IAsyncDisposable
     }
 
     public Task<string> CreateGame() => _hub.InvokeAsync<string>("CreateGame");
-    public Task<JoinResult> Join(string code, string name, string? color = null) =>
-        _hub.InvokeAsync<JoinResult>("JoinGame", code, name, color);
+    public Task<JoinResult> Join(string code, string name, string? avatar = null) =>
+        _hub.InvokeAsync<JoinResult>("JoinGame", code, name, avatar);
     public Task<GameView> Watch(string code) => _hub.InvokeAsync<GameView>("WatchGame", code);
     public Task<GameView> Reconnect(string code, string token) => _hub.InvokeAsync<GameView>("Reconnect", code, token);
     public Task Start(string code) => _hub.InvokeAsync("StartGame", code);

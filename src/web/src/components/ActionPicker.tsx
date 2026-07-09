@@ -120,7 +120,7 @@ export function ActionPicker({
               className={`target ${targetId === p.id ? 'target-picked' : ''}`}
               onClick={() => setTargetId(p.id)}
             >
-              🎯 <Avatar color={p.color} name={p.name} /> {p.name}
+              🎯 <Avatar avatar={p.avatar} name={p.name} /> {p.name}
             </button>
           ))}
         </div>

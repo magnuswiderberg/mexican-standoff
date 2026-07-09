@@ -11,8 +11,8 @@ export interface ActionDto {
 export interface PlayerSnapshot {
   id: string
   name: string
-  /** Avatar palette key (see colors.ts). */
-  color: string
+  /** Avatar key (see avatars.ts). */
+  avatar: string
   hp: number
   bullets: number
   gold: number
@@ -36,8 +36,8 @@ export interface GameSnapshot {
 export interface LobbyPlayer {
   id: string
   name: string
-  /** Avatar palette key (see colors.ts). */
-  color: string
+  /** Avatar key (see avatars.ts). */
+  avatar: string
 }
 
 export interface LobbyView {

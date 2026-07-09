@@ -8,12 +8,12 @@ import { PlayerBoard, Avatar } from '../components/PlayerBoard'
 import { RevealStage } from '../components/RevealStage'
 import { SoundToggle } from '../components/SoundToggle'
 import { Confetti } from '../components/Confetti'
-import { AVATAR_COLORS, colorOf } from '../colors'
+import { AVATARS, accentOf, avatarOf, avatarUrl } from '../avatars'
 import type { LobbyView } from '../types'
 import { navigate } from '../router'
 
 const NAME_KEY = 'standoff-name'
-const COLOR_KEY = 'standoff-color'
+const AVATAR_KEY = 'standoff-avatar'
 
 function JoinForm({
   code,
@@ -27,22 +27,23 @@ function JoinForm({
   onJoin: (name: string, color: string | null) => void
 }) {
   const [name, setName] = useState(() => localStorage.getItem(NAME_KEY) ?? '')
-  const [picked, setPicked] = useState<string | null>(() => localStorage.getItem(COLOR_KEY))
+  const [picked, setPicked] = useState<string | null>(() => localStorage.getItem(AVATAR_KEY))
   const [joining, setJoining] = useState(false)
 
-  const taken = new Set(lobby?.players.map((p) => p.color) ?? [])
-  // The stored favorite wins if free; otherwise fall back to the first free swatch.
+  const taken = new Set(lobby?.players.map((p) => p.avatar) ?? [])
+  // The stored favorite wins if free; otherwise fall back to the first free portrait.
   const selected =
-    picked !== null && !taken.has(picked) && (AVATAR_COLORS as readonly string[]).includes(picked)
+    picked !== null && !taken.has(picked) && avatarOf(picked)
       ? picked
-      : (AVATAR_COLORS.find((c) => !taken.has(c)) ?? null)
+      : (AVATARS.find((a) => !taken.has(a.key))?.key ?? null)
+  const selectedSpec = avatarOf(selected)
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const trimmed = name.trim()
     if (!trimmed || joining) return
     localStorage.setItem(NAME_KEY, trimmed)
-    if (selected) localStorage.setItem(COLOR_KEY, selected)
+    if (selected) localStorage.setItem(AVATAR_KEY, selected)
     setJoining(true)
     onJoin(trimmed, selected)
   }
@@ -61,28 +62,34 @@ function JoinForm({
         maxLength={20}
         autoFocus
       />
-      <div className="swatches">
-        {AVATAR_COLORS.map((c) => (
+      <div className="avatar-grid">
+        {AVATARS.map((a) => (
           <button
-            key={c}
+            key={a.key}
             type="button"
-            className={`swatch ${selected === c ? 'swatch-picked' : ''} ${taken.has(c) ? 'swatch-taken' : ''}`}
-            style={{ background: colorOf(c) }}
-            disabled={taken.has(c)}
-            aria-label={taken.has(c) ? `${c} (taken)` : c}
-            onClick={() => setPicked(c)}
+            className={`avatar-pick ${selected === a.key ? 'avatar-pick-selected' : ''} ${taken.has(a.key) ? 'avatar-pick-taken' : ''}`}
+            style={selected === a.key ? { borderColor: a.accent } : undefined}
+            disabled={taken.has(a.key)}
+            aria-label={taken.has(a.key) ? `${a.persona} (taken)` : a.persona}
+            onClick={() => setPicked(a.key)}
           >
-            {taken.has(c) ? '✕' : selected === c ? '✓' : ''}
+            <img src={avatarUrl(a.key)} alt={a.persona} />
+            {taken.has(a.key) && <span className="avatar-pick-x">✕</span>}
           </button>
         ))}
       </div>
+      {selectedSpec && (
+        <p className="persona" style={{ color: selectedSpec.accent }}>
+          {selectedSpec.name} — {selectedSpec.persona}
+        </p>
+      )}
       {(lobby?.players.length ?? 0) > 0 && (
         <p className="hint">
           Already in:{' '}
           {lobby!.players.map((p, i) => (
             <span key={p.id}>
               {i > 0 && ', '}
-              <span style={{ color: colorOf(p.color) }}>{p.name}</span>
+              <span style={{ color: accentOf(p.avatar) }}>{p.name}</span>
             </span>
           ))}
         </p>
@@ -147,7 +154,7 @@ export function PlayerPage({ code }: { code: string }) {
             <ul className="lobby-list">
               {game.lobby?.players.map((p) => (
                 <li key={p.id} className="lobby-player">
-                  <Avatar color={p.color} name={p.name} />
+                  <Avatar avatar={p.avatar} name={p.name} />
                   <span>{p.name}</span>
                   {p.id === playerId && <span className="you-badge">you</span>}
                 </li>
@@ -271,7 +278,7 @@ export function PlayerPage({ code }: { code: string }) {
                 : winners?.map((p, i) => (
                     <span key={p.id}>
                       {i > 0 && ' & '}
-                      <span style={{ color: colorOf(p.color) }}>{p.name}</span>
+                      <span style={{ color: accentOf(p.avatar) }}>{p.name}</span>
                     </span>
                   ))}
               {!iWon && ' wins!'}

@@ -3,7 +3,7 @@ import type { RevealJob } from '../useGame'
 import type { RevealStepDto } from '../types'
 import type { SfxName } from '../sound'
 import { applyStep, initialDisplayState, stepDuration } from '../reveal'
-import { colorOf } from '../colors'
+import { accentOf } from '../avatars'
 import { PlayerBoard } from './PlayerBoard'
 import type { ShotFx } from './PlayerBoard'
 import { Confetti } from './Confetti'
@@ -117,7 +117,7 @@ export function RevealStage({
   }, [job, stepIndex])
 
   const colorById = useMemo(
-    () => new Map(job.prev.players.map((p) => [p.id, colorOf(p.color)])),
+    () => new Map(job.prev.players.map((p) => [p.id, accentOf(p.avatar)])),
     [job],
   )
 

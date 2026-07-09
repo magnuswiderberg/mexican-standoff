@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { AVATAR_COLORS, colorOf } from '../colors'
+import { ACCENTS } from '../avatars'
 
 /**
  * CSS-only confetti rain. Pieces are laid out with index-derived pseudo-random
@@ -13,7 +13,7 @@ export function Confetti({ pieces = 90 }: { pieces?: number }) {
         const rand = (salt: number) => (((i + 7) * salt) % 101) / 101
         const style: CSSProperties = {
           left: `${rand(37) * 100}%`,
-          background: colorOf(AVATAR_COLORS[i % AVATAR_COLORS.length]),
+          background: ACCENTS[i % ACCENTS.length],
           animationDelay: `${rand(53) * 2.4}s`,
           animationDuration: `${2.6 + rand(29) * 2.2}s`,
           width: `${0.4 + rand(17) * 0.5}rem`,

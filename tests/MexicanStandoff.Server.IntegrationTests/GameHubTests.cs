@@ -43,20 +43,20 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
     }
 
     [Fact]
-    public async Task Join_AssignsAvatarColors_PreferredWhenFree_OtherwiseFirstFree()
+    public async Task Join_AssignsAvatars_PreferredWhenFree_OtherwiseFirstFree()
     {
         await using var client = await GameClient.ConnectAsync(_factory);
         var code = await client.CreateGame();
 
-        await client.Join(code, "Anna", "teal");
-        await client.Join(code, "Bob", "teal"); // taken → first free ("red")
-        await client.Join(code, "Cleo"); // no preference → next free ("orange")
+        await client.Join(code, "Anna", "cascabel");
+        await client.Join(code, "Bob", "cascabel"); // taken → first free ("forastero")
+        await client.Join(code, "Cleo"); // no preference → next free ("viuda")
         var lobby = await client.NextLobby();
         lobby = await client.NextLobby();
         lobby = await client.NextLobby();
 
-        Assert.Equal(["teal", "red", "orange"], lobby.Players.Select(p => p.Color).ToArray());
-        Assert.Equal(lobby.Players.Count, lobby.Players.Select(p => p.Color).Distinct().Count());
+        Assert.Equal(["cascabel", "forastero", "viuda"], lobby.Players.Select(p => p.Avatar).ToArray());
+        Assert.Equal(lobby.Players.Count, lobby.Players.Select(p => p.Avatar).Distinct().Count());
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 namespace MexicanStandoff.Server.Contracts;
 
-public sealed record PlayerSnapshot(string Id, string Name, string Color, int Hp, int Bullets, int Gold, bool IsAlive);
+public sealed record PlayerSnapshot(string Id, string Name, string Avatar, int Hp, int Bullets, int Gold, bool IsAlive);
 
 public sealed record GameSnapshot(
     string Code,
@@ -15,7 +15,7 @@ public sealed record GameSnapshot(
     int DuelSequenceLength,
     IReadOnlyList<PlayerSnapshot> Players);
 
-public sealed record LobbyPlayer(string Id, string Name, string Color);
+public sealed record LobbyPlayer(string Id, string Name, string Avatar);
 
 public sealed record LobbyView(string Code, IReadOnlyList<LobbyPlayer> Players, bool CanStart);
 
