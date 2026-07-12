@@ -28,12 +28,12 @@ public sealed class GameService(
     private static readonly string[] BotNames =
         ["Bot Sancho", "Bot Rosita", "Bot Dolores", "Bot Paco", "Bot Lupe", "Bot Chuy", "Bot Ramona"];
 
-    public string CreateGame(CreateGameSettings? settings = null)
+    public CreateGameResult CreateGame(CreateGameSettings? settings = null)
     {
         var session = store.Create();
         var seconds = settings?.SelectionTimerSeconds ?? options.Value.SelectionTimerSeconds;
         session.SelectionTimerSeconds = Math.Clamp(seconds, 0, 600);
-        return session.Code;
+        return new CreateGameResult(session.Code, session.MonitorToken);
     }
 
     public async Task<JoinResult> JoinAsync(string code, string name, string? preferredAvatar = null)
@@ -57,7 +57,7 @@ public sealed class GameService(
             var player = new SessionPlayer
             {
                 Id = $"p{++session.SeatsIssued}",
-                Token = Guid.NewGuid().ToString("N"),
+                Token = Tokens.New(),
                 Name = name,
                 Avatar = Avatars.Assign(preferredAvatar, session.Players.Select(p => p.Avatar)),
             };
@@ -89,10 +89,9 @@ public sealed class GameService(
 
     /// <summary>
     /// Dev-only (see <see cref="BotOptions"/>): adds a bot seat to the lobby.
-    /// Allowed for the host (first seat) or for the monitor (no token — the
-    /// monitor can already start the game without one).
+    /// Needs a control token (host seat or monitor), like the other game controls.
     /// </summary>
-    public async Task AddBotAsync(string code, string? hostToken)
+    public async Task AddBotAsync(string code, string? controlToken)
     {
         var session = Require(code);
         LobbyView lobby;
@@ -101,14 +100,9 @@ public sealed class GameService(
             ThrowIfStopped(session);
             if (!options.Value.Bots.Enabled)
                 throw new HubException("Bots are not enabled on this server.");
+            RequireController(session, controlToken, "add bots");
             if (session.Phase != GamePhase.Lobby)
                 throw new HubException("The game has already started.");
-            if (hostToken is not null)
-            {
-                var host = session.PlayerByToken(hostToken) ?? throw new HubException("Unknown player token.");
-                if (session.Players.Count == 0 || session.Players[0] != host)
-                    throw new HubException("Only the host can add bots.");
-            }
             if (session.Players.Count >= Parameters.MaxPlayers)
                 throw new HubException("The game is full.");
 
@@ -117,7 +111,7 @@ public sealed class GameService(
             var bot = new SessionPlayer
             {
                 Id = $"p{++session.SeatsIssued}",
-                Token = Guid.NewGuid().ToString("N"),
+                Token = Tokens.New(),
                 Name = BotNames.FirstOrDefault(n => !taken.Contains(n)) ?? $"Bot {session.SeatsIssued}",
                 Avatar = Avatars.Assign(null, session.Players.Select(p => p.Avatar)),
                 Brain = BotStrategies[botCount % BotStrategies.Length],
@@ -130,13 +124,13 @@ public sealed class GameService(
     }
 
     /// <summary>
-    /// Removes a player. Allowed for the host (first seat) or for the monitor
-    /// (no token — like <see cref="StartAsync"/> and <see cref="AddBotAsync"/>);
-    /// the monitor can kick anyone, including the host. In the lobby the seat is
-    /// freed; mid-game a kick is a forced resign (dodge out the current round,
-    /// then eliminated) — for players who lost their connection or walked away.
+    /// Removes a player. Needs a control token — the host's seat token or the
+    /// monitor token; the monitor can kick anyone, including the host, while the
+    /// host cannot kick themselves. In the lobby the seat is freed; mid-game a
+    /// kick is a forced resign (dodge out the current round, then eliminated) —
+    /// for players who lost their connection or walked away.
     /// </summary>
-    public async Task KickAsync(string code, string? hostToken, string targetPlayerId, string connectionId)
+    public async Task KickAsync(string code, string? controlToken, string targetPlayerId)
     {
         var session = Require(code);
         LobbyView? lobby = null;
@@ -147,20 +141,10 @@ public sealed class GameService(
             ThrowIfStopped(session);
             if (session.Phase != GamePhase.Lobby && session.Phase != GamePhase.Selecting)
                 throw new HubException("Kicking is only possible in the lobby or during a round.");
-            if (hostToken is not null)
-            {
-                var host = session.PlayerByToken(hostToken) ?? throw new HubException("Unknown player token.");
-                if (session.Players.Count == 0 || session.Players[0] != host)
-                    throw new HubException("Only the host can kick players.");
-                if (host.Id == targetPlayerId)
-                    throw new HubException("The host cannot kick themselves — leave or resign instead.");
-            }
-            else if (!session.MonitorConnections.Contains(connectionId))
-            {
-                // The tokenless path is the monitor's alone — only a registered
-                // monitor connection may kick without a host token.
-                throw new HubException("Only the host or the monitor can kick players.");
-            }
+            if (RequireController(session, controlToken, "kick players") == Controller.Host
+                && session.Host!.Id == targetPlayerId)
+                throw new HubException("The host cannot kick themselves — leave or resign instead.");
+
             var target = session.Players.FirstOrDefault(p => p.Id == targetPlayerId)
                 ?? throw new HubException("That player is not in the game.");
 
@@ -185,7 +169,8 @@ public sealed class GameService(
         await BroadcastResolvedAsync(session, outcome);
     }
 
-    public async Task StartAsync(string code)
+    /// <summary>Starts the first round. The host's phone or the monitor screen runs this.</summary>
+    public async Task StartAsync(string code, string? controlToken)
     {
         var session = Require(code);
         RoundStartedView view;
@@ -193,6 +178,7 @@ public sealed class GameService(
         lock (session.Lock)
         {
             ThrowIfStopped(session);
+            RequireController(session, controlToken, "start the game");
             if (session.Phase != GamePhase.Lobby)
                 throw new HubException("The game has already started.");
             if (session.Players.Count < Parameters.MinPlayers)
@@ -332,7 +318,7 @@ public sealed class GameService(
     /// kicked) before the host starts the next one. While a monitor is watching,
     /// only the monitor can trigger it (phones hide the button, this backs that up).
     /// </summary>
-    public async Task RematchAsync(string code, string connectionId)
+    public async Task RematchAsync(string code, string? controlToken)
     {
         var session = Require(code);
         LobbyView lobby;
@@ -341,7 +327,8 @@ public sealed class GameService(
             ThrowIfStopped(session);
             if (session.Phase != GamePhase.GameOver)
                 throw new HubException("A rematch is only possible after the game has ended.");
-            if (session.MonitorConnections.Count > 0 && !session.MonitorConnections.Contains(connectionId))
+            if (RequireController(session, controlToken, "start the next game") != Controller.Monitor
+                && session.MonitorConnections.Count > 0)
                 throw new HubException("The next game starts from the monitor.");
 
             session.Phase = GamePhase.Lobby;
@@ -356,13 +343,19 @@ public sealed class GameService(
         await hub.Clients.Group(session.Code).ReturnedToLobby(lobby);
     }
 
-    /// <summary>A monitor page subscribed; broadcast when the first one appears.</summary>
-    public async Task MonitorConnectedAsync(string code, string connectionId)
+    /// <summary>
+    /// A monitor page subscribed; broadcast when the first one appears. Registering
+    /// takes the monitor token — otherwise any phone could claim the big screen's
+    /// authority (and block the phones' own rematch button).
+    /// </summary>
+    public async Task MonitorConnectedAsync(string code, string monitorToken, string connectionId)
     {
         var session = Require(code);
         bool appeared;
         lock (session.Lock)
         {
+            if (!session.IsMonitorToken(monitorToken))
+                throw new HubException("This screen is not the monitor for that game.");
             appeared = session.MonitorConnections.Count == 0;
             session.MonitorConnections.Add(connectionId);
         }
@@ -388,11 +381,12 @@ public sealed class GameService(
     }
 
     /// <summary>Stops the game for everyone (monitor button). Terminal — the session is dead.</summary>
-    public async Task StopAsync(string code)
+    public async Task StopAsync(string code, string? controlToken)
     {
         var session = Require(code);
         lock (session.Lock)
         {
+            RequireController(session, controlToken, "stop the game");
             if (session.Phase == GamePhase.Stopped)
                 return; // two stop clicks racing — the first one already ended it
             session.Phase = GamePhase.Stopped;
@@ -433,6 +427,29 @@ public sealed class GameService(
     // ---- internals ----------------------------------------------------------
 
     private sealed record ResolveOutcome(RoundResolvedView View, int? NextNonce);
+
+    /// <summary>Who may run a game: the big screen that created it, or the host seat.</summary>
+    private enum Controller
+    {
+        Host,
+        Monitor,
+    }
+
+    /// <summary>
+    /// Gate for the game controls (start, stop, kick, rematch, add bot): the caller
+    /// must prove the monitor token or the host's seat token. Every device in the
+    /// room knows the game code and can reach the hub, so the code proves nothing —
+    /// without this a player could kick their rivals out and win by elimination.
+    /// Caller must hold the session lock.
+    /// </summary>
+    private static Controller RequireController(GameSession session, string? controlToken, string what)
+    {
+        if (session.IsMonitorToken(controlToken))
+            return Controller.Monitor;
+        if (session.Host is { } host && Tokens.Equal(host.Token, controlToken))
+            return Controller.Host;
+        throw new HubException($"Only the host or the monitor can {what}.");
+    }
 
     private GameSession Require(string code)
     {

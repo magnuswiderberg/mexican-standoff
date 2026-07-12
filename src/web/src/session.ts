@@ -17,6 +17,7 @@ export interface Seat {
 }
 
 const key = (code: string) => `standoff-seat-${code.toUpperCase()}`
+const monitorKey = (code: string) => `standoff-monitor-${code.toUpperCase()}`
 const channelName = (code: string) => `standoff-seat-hold-${code.toUpperCase()}`
 
 const PROBE_TIMEOUT_MS = 250
@@ -109,6 +110,27 @@ export function saveSeat(code: string, seat: Seat): void {
     // ignore
   }
   hold(code, seat.token)
+}
+
+// The monitor token (from CreateGame) is what proves this screen runs the game —
+// start, stop, kick, rematch. localStorage, not sessionStorage: the big screen is
+// one device, and closing its tab must not cost it the game it is hosting.
+
+export function saveMonitorToken(code: string, token: string): void {
+  try {
+    localStorage.setItem(monitorKey(code), token)
+  } catch {
+    // Private-mode storage failure: this screen can still watch, but a reload
+    // loses its monitor role — it re-hosts from the start page.
+  }
+}
+
+export function loadMonitorToken(code: string): string | null {
+  try {
+    return localStorage.getItem(monitorKey(code))
+  } catch {
+    return null
+  }
 }
 
 export function clearSeat(code: string): void {

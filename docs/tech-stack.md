@@ -47,6 +47,13 @@ great local dev experience, snappy realtime gameplay.
   a second tab on one browser joins as a new player) with a `localStorage`
   backup for the closed-tab QR-rescan rejoin; a `BroadcastChannel` probe stops
   a new tab from adopting the backup while the owning tab is still alive.
+- **Who may run a game**: the code is public — it is on the big screen and read
+  aloud — so it authorizes nothing beyond joining and watching. `CreateGame`
+  mints a **monitor token** and hands it to the creating screen alone (kept in
+  `localStorage`, replayed by its Monitor page). The game controls — start,
+  stop, kick, rematch, add bot — take a **control token**: that monitor token,
+  or the host seat's player token. Without this, any phone in the room could
+  claim the monitor role and kick its rivals out of the round one by one.
 - **Scale-out note**: in-memory state pins a game to one instance. Fine for a
   hobby project on a single-instance plan. If scale-out is ever needed:
   Azure SignalR Service + moving state to Cosmos/Redis.

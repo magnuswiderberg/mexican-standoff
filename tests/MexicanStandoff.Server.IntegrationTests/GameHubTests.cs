@@ -141,19 +141,18 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
     }
 
     [Fact]
-    public async Task Kick_FromTheMonitor_NeedsNoToken_AndCanRemoveTheHost()
+    public async Task Kick_FromTheMonitor_NeedsTheMonitorToken_AndCanRemoveTheHost()
     {
         await using var client = await GameClient.ConnectAsync(_factory);
         var code = await client.CreateGame();
         var anna = await client.Join(code, "Anna"); // host
         await client.Join(code, "Bob");
 
-        // A tokenless kick is the monitor's alone: rejected from a connection
-        // that has not registered as the monitor.
+        // Knowing the game code buys nothing: a kick needs a control token, and
+        // watching as a monitor is itself gated by the monitor token.
         await Assert.ThrowsAsync<HubException>(() => client.Kick(code, null, anna.PlayerId));
 
-        await client.WatchAsMonitor(code);
-        await client.Kick(code, null, anna.PlayerId);
+        await client.Kick(code, client.MonitorToken, anna.PlayerId);
         LobbyView lobby = null!;
         for (var i = 0; i < 3; i++) // 2 joins + 1 kick
             lobby = await client.NextLobby();
@@ -171,17 +170,17 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
         await client.Start(code);
         await client.NextRound();
 
-        // A non-host player cannot kick mid-game.
+        // A non-host player cannot kick mid-game — otherwise kicking your rivals
+        // out one by one would be a way to win.
         var ex = await Assert.ThrowsAsync<HubException>(() => client.Kick(code, bob.PlayerToken, cleo.PlayerId));
         Assert.Contains("host", ex.Message);
 
-        // Nor can an unregistered connection kick tokenless by pretending to be the monitor.
+        // Nor can anyone kick tokenless by pretending to be the monitor.
         await Assert.ThrowsAsync<HubException>(() => client.Kick(code, null, cleo.PlayerId));
 
-        // The monitor (no token) kicks Cleo: her dodge-out locks in immediately,
-        // and the broadcast flags her resigned so every device shows it at once.
-        await client.WatchAsMonitor(code);
-        await client.Kick(code, null, cleo.PlayerId);
+        // The monitor kicks Cleo: her dodge-out locks in immediately, and the
+        // broadcast flags her resigned so every device shows it at once.
+        await client.Kick(code, client.MonitorToken, cleo.PlayerId);
         var locked = await client.NextLock();
         Assert.Equal(1, locked.LockedCount);
         Assert.Contains(cleo.PlayerId, locked.ResignedPlayerIds);
@@ -388,6 +387,43 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
         await Assert.ThrowsAsync<HubException>(() => client.Watch("XXXX"));
     }
 
+    /// <summary>
+    /// The game code is public — it is on the big screen and read aloud — so it
+    /// must authorize nothing. A player who claimed the monitor role could kick
+    /// their rivals out of the round one by one and win by elimination.
+    /// </summary>
+    [Fact]
+    public async Task GameCode_AloneGrantsNoControl_OverSomeoneElsesGame()
+    {
+        await using var host = await GameClient.ConnectAsync(_factory);
+        var code = await host.CreateGame();
+        var anna = await host.Join(code, "Anna"); // host seat
+        var bob = await host.Join(code, "Bob");
+
+        // A phone on the same wifi: it knows the code (that is how it joined) and
+        // nothing else.
+        await using var intruder = await GameClient.ConnectAsync(_factory);
+        var mallory = await intruder.Join(code, "Mallory");
+
+        // It cannot claim the big screen's authority — not with no token, not
+        // with a seat token, not by guessing.
+        await Assert.ThrowsAsync<HubException>(() => intruder.WatchAsMonitor(code, monitorToken: ""));
+        await Assert.ThrowsAsync<HubException>(() => intruder.WatchAsMonitor(code, mallory.PlayerToken));
+
+        // ...and so every control stays shut, whatever token it tries.
+        foreach (var token in new string?[] { null, "", mallory.PlayerToken, bob.PlayerToken })
+        {
+            await Assert.ThrowsAsync<HubException>(() => intruder.Kick(code, token, anna.PlayerId));
+            await Assert.ThrowsAsync<HubException>(() => intruder.Start(code, token));
+            await Assert.ThrowsAsync<HubException>(() => intruder.Stop(code, token));
+        }
+
+        // Watching is still open to anyone with the code — that part is the point.
+        var view = await intruder.Watch(code);
+        Assert.Equal("Lobby", view.Phase);
+        Assert.Equal(3, view.Lobby.Players.Count);
+    }
+
     /// <summary>Plays a 2-player game to a winner (Anna kills Bob over two duel volleys).</summary>
     private static async Task<(JoinResult Anna, JoinResult Bob)> PlayTwoPlayerGameToWinner(
         GameClient client, string code)
@@ -454,37 +490,41 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
     {
         await using var client = await GameClient.ConnectAsync(_factory);
         var code = await client.CreateGame();
-        await PlayTwoPlayerGameToWinner(client, code);
+        var (anna, _) = await PlayTwoPlayerGameToWinner(client, code);
 
         await using var monitor = await GameClient.ConnectAsync(_factory);
-        await monitor.WatchAsMonitor(code);
+        await monitor.WatchAsMonitor(code, client.MonitorToken);
         Assert.True(await client.NextMonitorPresence());
         Assert.True((await client.Watch(code)).HasMonitor); // late hydrators see it too
 
-        // Phones can no longer trigger the rematch...
-        var ex = await Assert.ThrowsAsync<HubException>(() => client.Rematch(code));
+        // The host's phone can no longer trigger the rematch...
+        var ex = await Assert.ThrowsAsync<HubException>(() => client.Rematch(code, anna.PlayerToken));
         Assert.Contains("monitor", ex.Message);
 
         // ...but the monitor can.
-        await monitor.Rematch(code);
+        await monitor.Rematch(code, client.MonitorToken);
         await client.NextReturnedToLobby();
     }
 
     [Fact]
-    public async Task Rematch_FromPhones_WorksAgain_AfterTheMonitorDisconnects()
+    public async Task Rematch_FromTheHostsPhone_WorksAgain_AfterTheMonitorDisconnects()
     {
         await using var client = await GameClient.ConnectAsync(_factory);
         var code = await client.CreateGame();
-        await PlayTwoPlayerGameToWinner(client, code);
+        var (anna, bob) = await PlayTwoPlayerGameToWinner(client, code);
 
         var monitor = await GameClient.ConnectAsync(_factory);
-        await monitor.WatchAsMonitor(code);
+        await monitor.WatchAsMonitor(code, client.MonitorToken);
         Assert.True(await client.NextMonitorPresence());
 
         await monitor.DisposeAsync();
         Assert.False(await client.NextMonitorPresence());
 
-        await client.Rematch(code);
+        // With the big screen gone the host runs the game — but only the host:
+        // a rematch is not something any player may force on the room.
+        await Assert.ThrowsAsync<HubException>(() => client.Rematch(code, bob.PlayerToken));
+
+        await client.Rematch(code, anna.PlayerToken);
         await client.NextReturnedToLobby();
     }
 

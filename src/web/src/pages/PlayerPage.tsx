@@ -425,10 +425,12 @@ export function PlayerPage({ code }: { code: string }) {
             {game.actionError && <div className="error">{game.actionError}</div>}
             {game.hasMonitor ? (
               <p className="hint">📺 The next game starts from the monitor.</p>
-            ) : (
+            ) : isHost ? (
               <button className="primary" onClick={game.rematch}>
                 🔁 Play again — back to lobby
               </button>
+            ) : (
+              <p className="hint">The host starts the next game.</p>
             )}
           </div>
         )

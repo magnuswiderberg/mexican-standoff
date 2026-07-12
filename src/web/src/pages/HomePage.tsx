@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { createConnection, friendlyError } from '../gameClient'
 import { navigate } from '../router'
+import { saveMonitorToken } from '../session'
 import { Logo } from '../components/Logo'
-import type { CreateGameSettings } from '../types'
+import type { CreateGameResult, CreateGameSettings } from '../types'
 
 /** Selection timer choices; 0 means no timer (rounds wait for everyone). */
 const TIMER_CHOICES = [
@@ -32,8 +33,11 @@ export function HomePage() {
     try {
       await conn.start()
       const settings: CreateGameSettings = { selectionTimerSeconds: timerSeconds }
-      const newCode = await conn.invoke<string>('CreateGame', settings)
-      navigate(`/monitor/${newCode}`)
+      const game = await conn.invoke<CreateGameResult>('CreateGame', settings)
+      // This screen is now the monitor: the token it just got is what lets it
+      // start, stop and kick — the monitor page picks it back up from storage.
+      saveMonitorToken(game.code, game.monitorToken)
+      navigate(`/monitor/${game.code}`)
     } catch (e) {
       setError(friendlyError(e))
       setCreating(false)

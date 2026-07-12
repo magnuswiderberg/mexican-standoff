@@ -43,6 +43,12 @@ export interface CreateGameSettings {
   selectionTimerSeconds?: number | null
 }
 
+export interface CreateGameResult {
+  code: string
+  /** Secret that authorizes running this game (start/stop/kick/rematch) from the monitor. */
+  monitorToken: string
+}
+
 export interface LobbyPlayer {
   id: string
   name: string

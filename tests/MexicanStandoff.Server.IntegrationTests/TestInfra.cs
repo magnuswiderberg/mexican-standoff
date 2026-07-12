@@ -66,25 +66,43 @@ public sealed class GameClient : IAsyncDisposable
         return client;
     }
 
-    public Task<string> CreateGame(CreateGameSettings? settings = null) =>
-        _hub.InvokeAsync<string>("CreateGame", settings);
+    /// <summary>
+    /// Hosts a game and remembers its monitor token, so the control calls below
+    /// (start, stop, kick, rematch, add bot) can default to it — that is the
+    /// screen that created the game, exactly like the real monitor page.
+    /// </summary>
+    public async Task<string> CreateGame(CreateGameSettings? settings = null)
+    {
+        var result = await _hub.InvokeAsync<CreateGameResult>("CreateGame", settings);
+        MonitorToken = result.MonitorToken;
+        return result.Code;
+    }
+
+    /// <summary>The monitor token of the last game this client created (null if it created none).</summary>
+    public string? MonitorToken { get; private set; }
+
     public Task<JoinResult> Join(string code, string name, string? avatar = null) =>
         _hub.InvokeAsync<JoinResult>("JoinGame", code, name, avatar);
     public Task Leave(string code, string token) => _hub.InvokeAsync("LeaveGame", code, token);
-    public Task Kick(string code, string? token, string targetId) =>
-        _hub.InvokeAsync("KickPlayer", code, token, targetId);
-    public Task AddBot(string code, string? token = null) => _hub.InvokeAsync("AddBot", code, token);
+    public Task Kick(string code, string? controlToken, string targetId) =>
+        _hub.InvokeAsync("KickPlayer", code, controlToken, targetId);
+    public Task AddBot(string code, string? controlToken = null) =>
+        _hub.InvokeAsync("AddBot", code, controlToken ?? MonitorToken);
     public Task<GameView> Watch(string code) => _hub.InvokeAsync<GameView>("WatchGame", code);
-    public Task<GameView> WatchAsMonitor(string code) => _hub.InvokeAsync<GameView>("WatchAsMonitor", code);
+    public Task<GameView> WatchAsMonitor(string code, string? monitorToken = null) =>
+        _hub.InvokeAsync<GameView>("WatchAsMonitor", code, monitorToken ?? MonitorToken);
     public Task<GameView> Reconnect(string code, string token) => _hub.InvokeAsync<GameView>("Reconnect", code, token);
-    public Task Start(string code) => _hub.InvokeAsync("StartGame", code);
+    public Task Start(string code, string? controlToken = null) =>
+        _hub.InvokeAsync("StartGame", code, controlToken ?? MonitorToken);
     public Task Submit(string code, string token, ActionDto action) =>
         _hub.InvokeAsync("SubmitAction", code, token, action);
     public Task SubmitSequence(string code, string token, params ActionDto[] sequence) =>
         _hub.InvokeAsync("SubmitDuelSequence", code, token, sequence);
     public Task Resign(string code, string token) => _hub.InvokeAsync("Resign", code, token);
-    public Task Rematch(string code) => _hub.InvokeAsync("Rematch", code);
-    public Task Stop(string code) => _hub.InvokeAsync("StopGame", code);
+    public Task Rematch(string code, string? controlToken = null) =>
+        _hub.InvokeAsync("Rematch", code, controlToken ?? MonitorToken);
+    public Task Stop(string code, string? controlToken = null) =>
+        _hub.InvokeAsync("StopGame", code, controlToken ?? MonitorToken);
 
     public Task<LobbyView> NextLobby() => Next(_lobby);
     public Task<RoundStartedView> NextRound() => Next(_rounds);

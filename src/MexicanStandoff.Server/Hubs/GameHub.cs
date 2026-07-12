@@ -7,15 +7,17 @@ namespace MexicanStandoff.Server.Hubs;
 /// <summary>
 /// Thin SignalR endpoint: group membership + delegation to <see cref="GameService"/>.
 /// Player identity travels as a secret token with each call (stored client-side),
-/// so reconnects from any connection just work.
+/// so reconnects from any connection just work. The game controls take a control
+/// token the same way — the host's seat token or the monitor token from
+/// <see cref="CreateGame"/> — because the game code is public and authorizes nothing.
 /// </summary>
 public sealed class GameHub(GameService games) : Hub<IGameClient>
 {
-    public async Task<string> CreateGame(CreateGameSettings? settings = null)
+    public async Task<CreateGameResult> CreateGame(CreateGameSettings? settings = null)
     {
-        var code = games.CreateGame(settings);
-        await Groups.AddToGroupAsync(Context.ConnectionId, code);
-        return code;
+        var result = games.CreateGame(settings);
+        await Groups.AddToGroupAsync(Context.ConnectionId, result.Code);
+        return result;
     }
 
     public async Task<JoinResult> JoinGame(string gameCode, string playerName, string? preferredAvatar = null)
@@ -37,15 +39,16 @@ public sealed class GameHub(GameService games) : Hub<IGameClient>
     /// <summary>
     /// Monitor page: like <see cref="WatchGame"/>, but registers as the game's
     /// monitor — while one is connected, rematches start from the monitor only.
+    /// Takes the monitor token from <see cref="CreateGame"/>: the big screen is a
+    /// role, not a URL anyone can open.
     /// </summary>
-    public async Task<GameView> WatchAsMonitor(string gameCode)
+    public async Task<GameView> WatchAsMonitor(string gameCode, string monitorToken)
     {
         var code = Normalize(gameCode);
-        var view = games.GetView(code, token: null);
+        await games.MonitorConnectedAsync(code, monitorToken, Context.ConnectionId);
         Context.Items[MonitorCodeKey] = code;
         await Groups.AddToGroupAsync(Context.ConnectionId, code);
-        await games.MonitorConnectedAsync(code, Context.ConnectionId);
-        return view;
+        return games.GetView(code, token: null);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
@@ -67,15 +70,16 @@ public sealed class GameHub(GameService games) : Hub<IGameClient>
     public Task LeaveGame(string gameCode, string playerToken) =>
         games.LeaveAsync(Normalize(gameCode), playerToken);
 
-    /// <summary>Host kicks with their token; the monitor kicks with none (like StartGame).</summary>
-    public Task KickPlayer(string gameCode, string? playerToken, string targetPlayerId) =>
-        games.KickAsync(Normalize(gameCode), playerToken, targetPlayerId, Context.ConnectionId);
+    /// <summary>Host kicks with their seat token, the monitor with the monitor token.</summary>
+    public Task KickPlayer(string gameCode, string? controlToken, string targetPlayerId) =>
+        games.KickAsync(Normalize(gameCode), controlToken, targetPlayerId);
 
-    /// <summary>Dev-only, config-gated: the host (or the monitor, with no token) adds a bot seat.</summary>
-    public Task AddBot(string gameCode, string? playerToken = null) =>
-        games.AddBotAsync(Normalize(gameCode), playerToken);
+    /// <summary>Dev-only, config-gated: the host or the monitor adds a bot seat.</summary>
+    public Task AddBot(string gameCode, string? controlToken = null) =>
+        games.AddBotAsync(Normalize(gameCode), controlToken);
 
-    public Task StartGame(string gameCode) => games.StartAsync(Normalize(gameCode));
+    public Task StartGame(string gameCode, string? controlToken) =>
+        games.StartAsync(Normalize(gameCode), controlToken);
 
     public Task SubmitAction(string gameCode, string playerToken, ActionDto action) =>
         games.SubmitActionAsync(Normalize(gameCode), playerToken, action);
@@ -87,10 +91,12 @@ public sealed class GameHub(GameService games) : Hub<IGameClient>
     public Task Resign(string gameCode, string playerToken) =>
         games.ResignAsync(Normalize(gameCode), playerToken);
 
-    public Task Rematch(string gameCode) => games.RematchAsync(Normalize(gameCode), Context.ConnectionId);
+    public Task Rematch(string gameCode, string? controlToken) =>
+        games.RematchAsync(Normalize(gameCode), controlToken);
 
-    /// <summary>Monitor button: ends the game for everyone (no token, like StartGame).</summary>
-    public Task StopGame(string gameCode) => games.StopAsync(Normalize(gameCode));
+    /// <summary>Monitor button: ends the game for everyone.</summary>
+    public Task StopGame(string gameCode, string? controlToken) =>
+        games.StopAsync(Normalize(gameCode), controlToken);
 
     /// <summary>Context.Items key: the game code this connection watches as a monitor.</summary>
     private const string MonitorCodeKey = "monitorCode";

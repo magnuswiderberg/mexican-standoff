@@ -48,13 +48,13 @@ public class BotTests
     }
 
     [Fact]
-    public async Task Monitor_AddsBotsWithoutAToken_AndABotsOnlyGameAutoPlays()
+    public async Task Monitor_AddsBotsWithItsOwnToken_AndABotsOnlyGameAutoPlays()
     {
         using var factory = new StandoffServerFactory { BotsEnabled = true };
         await using var monitor = await GameClient.ConnectAsync(factory);
         var code = await monitor.CreateGame();
 
-        await monitor.AddBot(code); // no token: the monitor is allowed
+        await monitor.AddBot(code); // the monitor token it got from CreateGame
         await monitor.AddBot(code);
         LobbyView lobby = null!;
         for (var i = 0; i < 2; i++)

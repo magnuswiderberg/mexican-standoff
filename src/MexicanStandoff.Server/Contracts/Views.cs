@@ -27,6 +27,13 @@ public sealed record LobbyView(
 
 public sealed record JoinResult(string PlayerId, string PlayerToken, LobbyView Lobby);
 
+/// <summary>
+/// The new game, plus the secret that authorizes running it. The token goes back
+/// to the creating screen only (it keeps it for its monitor page) — never to the
+/// game group, or any phone on the wifi could kick the room and start the game.
+/// </summary>
+public sealed record CreateGameResult(string Code, string MonitorToken);
+
 public sealed record RoundStartedView(GameSnapshot Snapshot, DateTimeOffset? Deadline);
 
 public sealed record PlayerLockedView(

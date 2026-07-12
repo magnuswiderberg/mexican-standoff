@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
 
 namespace MexicanStandoff.Server.Games;
@@ -23,9 +24,11 @@ public sealed class InMemoryGameStore(IOptions<GameOptions> options) : IGameStor
         Prune();
         while (true)
         {
+            // Crypto RNG: a code is short and public, but knowing one must not
+            // let anyone predict the codes of the games created around it.
             var code = string.Concat(Enumerable.Range(0, CodeLength)
-                .Select(_ => CodeAlphabet[Random.Shared.Next(CodeAlphabet.Length)]));
-            var session = new GameSession { Code = code };
+                .Select(_ => CodeAlphabet[RandomNumberGenerator.GetInt32(CodeAlphabet.Length)]));
+            var session = new GameSession { Code = code, MonitorToken = Tokens.New() };
             if (_sessions.TryAdd(code, session))
                 return session;
         }

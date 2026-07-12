@@ -37,6 +37,14 @@ public sealed class SessionPlayer
 public sealed class GameSession
 {
     public required string Code { get; init; }
+
+    /// <summary>
+    /// Secret minted with the game and handed only to the screen that created it.
+    /// It — or the host's seat token — is what authorizes running the game
+    /// (start, stop, kick, rematch, add bot); the game code authorizes nothing.
+    /// </summary>
+    public required string MonitorToken { get; init; }
+
     public readonly object Lock = new();
 
     public GamePhase Phase { get; set; } = GamePhase.Lobby;
@@ -59,8 +67,9 @@ public sealed class GameSession
     public int SelectionNonce { get; set; }
 
     /// <summary>
-    /// Connection ids of monitor pages watching this game. While non-empty,
-    /// starting a rematch is monitor-only. Only touched under <see cref="Lock"/>.
+    /// Connection ids of monitor pages watching this game (each proved the
+    /// <see cref="MonitorToken"/> to get in). While non-empty, starting a rematch
+    /// is monitor-only. Only touched under <see cref="Lock"/>.
     /// </summary>
     public HashSet<string> MonitorConnections { get; } = [];
 
@@ -73,5 +82,11 @@ public sealed class GameSession
     public IReadOnlyList<string>? WinnerIds { get; set; }
     public WinReason? WinReason { get; set; }
 
-    public SessionPlayer? PlayerByToken(string token) => Players.FirstOrDefault(p => p.Token == token);
+    public SessionPlayer? PlayerByToken(string? token) =>
+        token is null ? null : Players.FirstOrDefault(p => Tokens.Equal(p.Token, token));
+
+    public bool IsMonitorToken(string? token) => Tokens.Equal(MonitorToken, token);
+
+    /// <summary>The host is the first seat — they run the game from their phone when there is no monitor.</summary>
+    public SessionPlayer? Host => Players.FirstOrDefault();
 }

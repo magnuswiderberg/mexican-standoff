@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import type { HubConnection } from '@microsoft/signalr'
 import { createConnection, friendlyError } from './gameClient'
-import { clearSeat, loadSeat, releaseSeatHold, saveSeat } from './session'
+import { clearSeat, loadMonitorToken, loadSeat, releaseSeatHold, saveSeat } from './session'
 import type {
   ActionDto,
   GameSnapshot,
@@ -222,9 +222,10 @@ export interface GameApi extends State {
 
 /**
  * One SignalR connection per mounted page. `player` mode reconnects a stored
- * seat (or asks to join); `monitor` mode watches without a seat. Reveal scripts
- * are queued so a server-side timeout resolving the next round mid-playback
- * can never skip a reveal.
+ * seat (or asks to join); `monitor` mode watches without a seat, proving the
+ * monitor token this screen got when it hosted the game. Reveal scripts are
+ * queued so a server-side timeout resolving the next round mid-playback can
+ * never skip a reveal.
  */
 export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
   const [state, dispatch] = useReducer(reduce, initial)
@@ -233,6 +234,9 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
   // only the cross-refresh backup — tabs are isolated players, so a second tab
   // never steals a live tab's seat.
   const tokenRef = useRef<string | null>(null)
+  // The monitor's counterpart to the seat token: this screen's proof that it
+  // hosts the game. The server takes either as the control token.
+  const monitorTokenRef = useRef<string | null>(null)
   // Mirrors state.playerId for the connection handlers (kick detection).
   const playerIdRef = useRef<string | null>(null)
   // Set while our own LeaveGame call is in flight, so the lobby echo without
@@ -247,6 +251,7 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
     let disposed = false
     const conn = createConnection()
     connRef.current = conn
+    monitorTokenRef.current = mode === 'monitor' ? loadMonitorToken(code) : null
     snapshotRef.current = null
     playerIdRef.current = null
     leavingRef.current = false
@@ -325,7 +330,16 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
 
     async function hydrate() {
       if (mode === 'monitor') {
-        const view = await conn.invoke<GameView>('WatchAsMonitor', code)
+        const monitorToken = monitorTokenRef.current
+        if (!monitorToken) {
+          // Someone opened a monitor URL on a screen that never hosted this game.
+          dispatch({
+            type: 'fatal',
+            error: 'This screen is not the monitor for that game. Host a game to run one here.',
+          })
+          return
+        }
+        const view = await conn.invoke<GameView>('WatchAsMonitor', code, monitorToken)
         if (disposed) return
         snapshotRef.current = view.snapshot
         dispatch({ type: 'hydrate', view })
@@ -394,6 +408,14 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
     [],
   )
 
+  // What the server takes as proof for the game controls (start, stop, kick,
+  // rematch, add bot): the monitor's token on the big screen, the seat token on
+  // a phone — where only the host's is accepted.
+  const controlToken = useCallback(
+    () => (mode === 'monitor' ? monitorTokenRef.current : tokenRef.current),
+    [mode],
+  )
+
   const join = useCallback(
     async (name: string, color: string | null) => {
       try {
@@ -432,31 +454,29 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
   const kick = useCallback(
     async (targetPlayerId: string) => {
       try {
-        // Token for the seated host; null from the monitor (allowed server-side).
-        await invoke('KickPlayer', code, tokenRef.current, targetPlayerId)
+        await invoke('KickPlayer', code, controlToken(), targetPlayerId)
       } catch (e) {
         dispatch({ type: 'actionError', error: friendlyError(e) })
       }
     },
-    [code, invoke],
+    [code, invoke, controlToken],
   )
 
   const addBot = useCallback(async () => {
     try {
-      // Token for a seated host; null from the monitor (allowed server-side).
-      await invoke('AddBot', code, tokenRef.current)
+      await invoke('AddBot', code, controlToken())
     } catch (e) {
       dispatch({ type: 'actionError', error: friendlyError(e) })
     }
-  }, [code, invoke])
+  }, [code, invoke, controlToken])
 
   const start = useCallback(async () => {
     try {
-      await invoke('StartGame', code)
+      await invoke('StartGame', code, controlToken())
     } catch (e) {
       dispatch({ type: 'actionError', error: friendlyError(e) })
     }
-  }, [code, invoke])
+  }, [code, invoke, controlToken])
 
   const submitAction = useCallback(
     async (action: ActionDto) => {
@@ -499,19 +519,19 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
 
   const rematch = useCallback(async () => {
     try {
-      await invoke('Rematch', code)
+      await invoke('Rematch', code, controlToken())
     } catch (e) {
       dispatch({ type: 'actionError', error: friendlyError(e) })
     }
-  }, [code, invoke])
+  }, [code, invoke, controlToken])
 
   const stop = useCallback(async () => {
     try {
-      await invoke('StopGame', code)
+      await invoke('StopGame', code, controlToken())
     } catch (e) {
       dispatch({ type: 'actionError', error: friendlyError(e) })
     }
-  }, [code, invoke])
+  }, [code, invoke, controlToken])
 
   const finishReveal = useCallback(() => {
     const current = state.reveal
