@@ -1,3 +1,4 @@
+using MexicanStandoff.Bots;
 using MexicanStandoff.Engine;
 
 namespace MexicanStandoff.Server.Games;
@@ -7,6 +8,8 @@ public enum GamePhase
     Lobby,
     Selecting,
     GameOver,
+    /// <summary>Terminal: the monitor stopped the game; no further play is possible.</summary>
+    Stopped,
 }
 
 public sealed class SessionPlayer
@@ -16,6 +19,15 @@ public sealed class SessionPlayer
     public required string Name { get; init; }
     /// <summary>Avatar key from <see cref="Games.Avatars.All"/>.</summary>
     public required string Avatar { get; init; }
+    /// <summary>Dev bot seat: the strategy the server plays each selection phase; null for humans.</summary>
+    public IBot? Brain { get; init; }
+    public bool IsBot => Brain is not null;
+
+    /// <summary>
+    /// Resigned this game: dodges the round they resigned in, then the engine
+    /// eliminates them at resolution. Reset on game start.
+    /// </summary>
+    public bool Resigned { get; set; }
 }
 
 /// <summary>
@@ -29,6 +41,15 @@ public sealed class GameSession
 
     public GamePhase Phase { get; set; } = GamePhase.Lobby;
     public List<SessionPlayer> Players { get; } = [];
+
+    /// <summary>
+    /// Seconds players get to pick an action; 0 disables the timer. Set once at
+    /// creation (host's settings panel, falling back to config) — immutable after.
+    /// </summary>
+    public int SelectionTimerSeconds { get; set; }
+
+    /// <summary>Total seats ever issued — ids stay unique even after lobby leaves/kicks.</summary>
+    public int SeatsIssued { get; set; }
     public GameState? State { get; set; }
 
     public Dictionary<string, PlayerAction> PendingActions { get; } = [];
@@ -36,6 +57,15 @@ public sealed class GameSession
 
     /// <summary>Incremented per selection phase; stale timeout callbacks compare and bail.</summary>
     public int SelectionNonce { get; set; }
+
+    /// <summary>
+    /// Connection ids of monitor pages watching this game. While non-empty,
+    /// starting a rematch is monitor-only. Only touched under <see cref="Lock"/>.
+    /// </summary>
+    public HashSet<string> MonitorConnections { get; } = [];
+
+    /// <summary>RNG for bot decisions; only touched under <see cref="Lock"/>.</summary>
+    public Random BotRng { get; } = new();
 
     public DateTimeOffset? Deadline { get; set; }
     public DateTimeOffset LastActivity { get; set; } = DateTimeOffset.UtcNow;

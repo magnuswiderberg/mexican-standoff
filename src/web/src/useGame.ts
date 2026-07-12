@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import type { HubConnection } from '@microsoft/signalr'
 import { createConnection, friendlyError } from './gameClient'
-import { clearSeat, getSeat, saveSeat } from './session'
+import { clearSeat, loadSeat, releaseSeatHold, saveSeat } from './session'
 import type {
   ActionDto,
   GameSnapshot,
@@ -20,6 +20,7 @@ export type UiPhase =
   | 'selecting'
   | 'revealing'
   | 'gameover'
+  | 'stopped' // the monitor stopped the game; terminal info screen
   | 'fatal'
 
 /** One queued reveal playback: the script plus the snapshot it starts from. */
@@ -38,10 +39,17 @@ interface State {
   deadline: string | null
   locked: PlayerLockedView | null
   hasSubmitted: boolean
+  /** Local echo of what we locked in (action, or duel sequence), for the waiting banner. */
+  submittedAction: ActionDto | null
+  submittedSequence: ActionDto[] | null
   winnerIds: string[] | null
   winReason: string | null
   playerId: string | null
   reveal: RevealJob | null
+  /** Local echo of our own resign, so the UI flips before the next snapshot arrives. */
+  resigned: boolean
+  /** A monitor page is watching — rematches start from the monitor, not the phones. */
+  hasMonitor: boolean
 }
 
 const initial: State = {
@@ -53,10 +61,14 @@ const initial: State = {
   deadline: null,
   locked: null,
   hasSubmitted: false,
+  submittedAction: null,
+  submittedSequence: null,
   winnerIds: null,
   winReason: null,
   playerId: null,
   reveal: null,
+  resigned: false,
+  hasMonitor: false,
 }
 
 type Msg =
@@ -68,7 +80,11 @@ type Msg =
   | { type: 'lobbyUpdated'; lobby: LobbyView }
   | { type: 'roundStarted'; view: RoundStartedView }
   | { type: 'playerLocked'; view: PlayerLockedView }
-  | { type: 'submitted' }
+  | { type: 'submitted'; action?: ActionDto; sequence?: ActionDto[] }
+  | { type: 'resigned' }
+  | { type: 'returnedToLobby'; lobby: LobbyView }
+  | { type: 'stopped' }
+  | { type: 'monitorPresence'; hasMonitor: boolean }
   | { type: 'startReveal'; job: RevealJob }
   | { type: 'revealDone'; view: RoundResolvedView; nextJob: RevealJob | null }
 
@@ -85,26 +101,39 @@ function reduce(state: State, msg: Msg): State {
     case 'hydrate': {
       const v = msg.view
       const phase: UiPhase =
-        v.phase === 'Lobby' ? 'lobby' : v.phase === 'Selecting' ? 'selecting' : 'gameover'
+        v.phase === 'Lobby'
+          ? 'lobby'
+          : v.phase === 'Selecting'
+            ? 'selecting'
+            : v.phase === 'Stopped'
+              ? 'stopped'
+              : 'gameover'
+      const playerId = v.playerId ?? state.playerId
       return {
         ...state,
         phase,
         lobby: v.lobby,
         snapshot: v.snapshot,
         deadline: v.deadline,
-        playerId: v.playerId ?? state.playerId,
+        playerId,
         hasSubmitted: v.hasSubmitted,
+        // A rehydrate (refresh/reconnect) can't recover what we picked — the
+        // banner falls back to a plain "Locked in."
+        submittedAction: null,
+        submittedSequence: null,
         winnerIds: v.winnerIds,
         winReason: v.winReason,
         locked: null,
         reveal: null,
         actionError: null,
+        resigned: v.snapshot?.players.find((p) => p.id === playerId)?.isResigned ?? false,
+        hasMonitor: v.hasMonitor,
       }
     }
     case 'lobbyUpdated':
       return { ...state, lobby: msg.lobby }
     case 'roundStarted':
-      // Fires on game start and on rematch.
+      // Fires when a game starts from the lobby (resign flags reset server-side).
       return {
         ...state,
         phase: 'selecting',
@@ -112,21 +141,54 @@ function reduce(state: State, msg: Msg): State {
         deadline: msg.view.deadline,
         locked: null,
         hasSubmitted: false,
+        submittedAction: null,
+        submittedSequence: null,
         winnerIds: null,
         winReason: null,
         reveal: null,
         actionError: null,
+        resigned: false,
       }
     case 'playerLocked':
       return { ...state, locked: msg.view }
     case 'submitted':
-      return { ...state, hasSubmitted: true, actionError: null }
+      return {
+        ...state,
+        hasSubmitted: true,
+        submittedAction: msg.action ?? null,
+        submittedSequence: msg.sequence ?? null,
+        actionError: null,
+      }
+    case 'resigned':
+      return { ...state, resigned: true, actionError: null }
+    case 'returnedToLobby':
+      return {
+        ...state,
+        phase: 'lobby',
+        lobby: msg.lobby,
+        snapshot: null,
+        deadline: null,
+        locked: null,
+        hasSubmitted: false,
+        submittedAction: null,
+        submittedSequence: null,
+        winnerIds: null,
+        winReason: null,
+        reveal: null,
+        actionError: null,
+        resigned: false,
+      }
+    case 'stopped':
+      return { ...state, phase: 'stopped', deadline: null, locked: null, reveal: null }
+    case 'monitorPresence':
+      return { ...state, hasMonitor: msg.hasMonitor }
     case 'startReveal':
       return { ...state, phase: 'revealing', reveal: msg.job, locked: null, actionError: null }
     case 'revealDone': {
       const v = msg.view
       if (msg.nextJob) return { ...state, snapshot: v.snapshot, reveal: msg.nextJob }
-      const over = v.winnerIds !== null && v.winnerIds.length > 0
+      // Non-null (even empty: mutual destruction, no winner) means game over.
+      const over = v.winnerIds !== null
       return {
         ...state,
         phase: over ? 'gameover' : 'selecting',
@@ -135,6 +197,8 @@ function reduce(state: State, msg: Msg): State {
         winnerIds: v.winnerIds,
         winReason: v.winReason,
         hasSubmitted: false,
+        submittedAction: null,
+        submittedSequence: null,
         locked: null,
         reveal: null,
       }
@@ -144,10 +208,15 @@ function reduce(state: State, msg: Msg): State {
 
 export interface GameApi extends State {
   join(name: string, color: string | null): Promise<void>
+  leave(): Promise<void>
+  kick(targetPlayerId: string): Promise<void>
+  addBot(): Promise<void>
   start(): Promise<void>
   submitAction(action: ActionDto): Promise<void>
   submitSequence(sequence: ActionDto[]): Promise<void>
+  resign(): Promise<void>
   rematch(): Promise<void>
+  stop(): Promise<void>
   finishReveal(): void
 }
 
@@ -160,9 +229,15 @@ export interface GameApi extends State {
 export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
   const [state, dispatch] = useReducer(reduce, initial)
   const connRef = useRef<HubConnection | null>(null)
-  // The seat token lives in memory once known; localStorage is only the
-  // cross-refresh backup (two tabs on one device must not steal each other's seat).
+  // The seat token lives in memory once known; storage (see session.ts) is
+  // only the cross-refresh backup — tabs are isolated players, so a second tab
+  // never steals a live tab's seat.
   const tokenRef = useRef<string | null>(null)
+  // Mirrors state.playerId for the connection handlers (kick detection).
+  const playerIdRef = useRef<string | null>(null)
+  // Set while our own LeaveGame call is in flight, so the lobby echo without
+  // our seat isn't mistaken for a kick.
+  const leavingRef = useRef(false)
   // Latest snapshot the server told us about (applied or not yet played).
   const snapshotRef = useRef<GameSnapshot | null>(null)
   const queueRef = useRef<RevealJob[]>([])
@@ -173,11 +248,25 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
     const conn = createConnection()
     connRef.current = conn
     snapshotRef.current = null
+    playerIdRef.current = null
+    leavingRef.current = false
     queueRef.current = []
     playingRef.current = false
 
     conn.on('LobbyUpdated', (lobby: LobbyView) => {
-      if (!disposed) dispatch({ type: 'lobbyUpdated', lobby })
+      if (disposed) return
+      const myId = playerIdRef.current
+      if (mode === 'player' && tokenRef.current && myId && !lobby.players.some((p) => p.id === myId)) {
+        // Our seat is gone: the host kicked us (or our own leave echoed back).
+        const kicked = !leavingRef.current
+        tokenRef.current = null
+        playerIdRef.current = null
+        clearSeat(code)
+        dispatch({ type: 'needJoin', lobby })
+        if (kicked) dispatch({ type: 'actionError', error: 'The host removed you from the game.' })
+        return
+      }
+      dispatch({ type: 'lobbyUpdated', lobby })
     })
 
     // A player without a seat is only watching the lobby from the join form —
@@ -197,6 +286,30 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
       if (!disposed) dispatch({ type: 'playerLocked', view })
     })
 
+    conn.on('ReturnedToLobby', (lobby: LobbyView) => {
+      if (disposed) return
+      snapshotRef.current = null
+      queueRef.current = []
+      playingRef.current = false
+      if (seated()) {
+        dispatch({ type: 'returnedToLobby', lobby })
+      } else {
+        // Unseated join form: just refresh its lobby list.
+        dispatch({ type: 'lobbyUpdated', lobby })
+      }
+    })
+
+    conn.on('GameStopped', () => {
+      if (disposed) return
+      queueRef.current = []
+      playingRef.current = false
+      dispatch({ type: 'stopped' })
+    })
+
+    conn.on('MonitorPresence', (hasMonitor: boolean) => {
+      if (!disposed) dispatch({ type: 'monitorPresence', hasMonitor })
+    })
+
     conn.on('RoundResolved', (view: RoundResolvedView) => {
       if (disposed || !seated()) return
       const prev = snapshotRef.current ?? view.snapshot
@@ -212,7 +325,7 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
 
     async function hydrate() {
       if (mode === 'monitor') {
-        const view = await conn.invoke<GameView>('WatchGame', code)
+        const view = await conn.invoke<GameView>('WatchAsMonitor', code)
         if (disposed) return
         snapshotRef.current = view.snapshot
         dispatch({ type: 'hydrate', view })
@@ -230,7 +343,7 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
         }
       }
 
-      const token = tokenRef.current ?? getSeat(code)?.token
+      const token = tokenRef.current ?? (await loadSeat(code))?.token
       if (!token) {
         await watchForJoin()
         return
@@ -239,6 +352,7 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
         const view = await conn.invoke<GameView>('Reconnect', code, token)
         if (disposed) return
         tokenRef.current = token
+        playerIdRef.current = view.playerId ?? null
         snapshotRef.current = view.snapshot
         dispatch({ type: 'hydrate', view })
       } catch {
@@ -266,6 +380,7 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
     return () => {
       disposed = true
       connRef.current = null
+      releaseSeatHold()
       conn.stop().catch(() => {})
     }
   }, [code, mode])
@@ -284,6 +399,7 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
       try {
         const result = (await invoke('JoinGame', code, name, color)) as JoinResult
         tokenRef.current = result.playerToken
+        playerIdRef.current = result.playerId
         saveSeat(code, { playerId: result.playerId, token: result.playerToken, name })
         dispatch({ type: 'joined', playerId: result.playerId, lobby: result.lobby })
       } catch (e) {
@@ -292,6 +408,47 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
     },
     [code, invoke],
   )
+
+  const leave = useCallback(async () => {
+    const token = tokenRef.current
+    if (!token) return
+    leavingRef.current = true
+    try {
+      await invoke('LeaveGame', code, token)
+      // The lobby echo may have reset us already; if not, do it here.
+      if (tokenRef.current === token) {
+        tokenRef.current = null
+        playerIdRef.current = null
+        clearSeat(code)
+        dispatch({ type: 'needJoin', lobby: null })
+      }
+    } catch (e) {
+      dispatch({ type: 'actionError', error: friendlyError(e) })
+    } finally {
+      leavingRef.current = false
+    }
+  }, [code, invoke])
+
+  const kick = useCallback(
+    async (targetPlayerId: string) => {
+      try {
+        // Token for the seated host; null from the monitor (allowed server-side).
+        await invoke('KickPlayer', code, tokenRef.current, targetPlayerId)
+      } catch (e) {
+        dispatch({ type: 'actionError', error: friendlyError(e) })
+      }
+    },
+    [code, invoke],
+  )
+
+  const addBot = useCallback(async () => {
+    try {
+      // Token for a seated host; null from the monitor (allowed server-side).
+      await invoke('AddBot', code, tokenRef.current)
+    } catch (e) {
+      dispatch({ type: 'actionError', error: friendlyError(e) })
+    }
+  }, [code, invoke])
 
   const start = useCallback(async () => {
     try {
@@ -307,7 +464,7 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
       if (!token) return
       try {
         await invoke('SubmitAction', code, token, action)
-        dispatch({ type: 'submitted' })
+        dispatch({ type: 'submitted', action })
       } catch (e) {
         dispatch({ type: 'actionError', error: friendlyError(e) })
       }
@@ -321,7 +478,7 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
       if (!token) return
       try {
         await invoke('SubmitDuelSequence', code, token, sequence)
-        dispatch({ type: 'submitted' })
+        dispatch({ type: 'submitted', sequence })
       } catch (e) {
         dispatch({ type: 'actionError', error: friendlyError(e) })
       }
@@ -329,9 +486,28 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
     [code, invoke],
   )
 
+  const resign = useCallback(async () => {
+    const token = tokenRef.current
+    if (!token) return
+    try {
+      await invoke('Resign', code, token)
+      dispatch({ type: 'resigned' })
+    } catch (e) {
+      dispatch({ type: 'actionError', error: friendlyError(e) })
+    }
+  }, [code, invoke])
+
   const rematch = useCallback(async () => {
     try {
       await invoke('Rematch', code)
+    } catch (e) {
+      dispatch({ type: 'actionError', error: friendlyError(e) })
+    }
+  }, [code, invoke])
+
+  const stop = useCallback(async () => {
+    try {
+      await invoke('StopGame', code)
     } catch (e) {
       dispatch({ type: 'actionError', error: friendlyError(e) })
     }
@@ -348,10 +524,15 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
   return {
     ...state,
     join,
+    leave,
+    kick,
+    addBot,
     start,
     submitAction,
     submitSequence,
+    resign,
     rematch,
+    stop,
     finishReveal,
   }
 }

@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { playSfx } from './sound'
 import type { SfxName } from './sound'
+import type { LobbyView } from './types'
 
 export interface Sound {
   enabled: boolean
@@ -36,4 +37,25 @@ export function useSound(page: 'player' | 'monitor'): Sound {
   }, [key])
 
   return { enabled, toggle, play }
+}
+
+/**
+ * Chimes when a player joins or leaves the lobby list. Watches seat ids, not
+ * counts, so a simultaneous join+leave plays both. The first list seen after
+ * entering the lobby (hydrate, rematch return) is a baseline, not a chime.
+ */
+export function useLobbyChime(phase: string, lobby: LobbyView | null, play: Sound['play']): void {
+  const prevIds = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    if (phase !== 'lobby' && phase !== 'joining') {
+      prevIds.current = null
+      return
+    }
+    const ids = new Set(lobby?.players.map((p) => p.id) ?? [])
+    const prev = prevIds.current
+    prevIds.current = ids
+    if (prev === null) return
+    if ([...ids].some((id) => !prev.has(id))) play('join')
+    if ([...prev].some((id) => !ids.has(id))) play('leave')
+  }, [phase, lobby, play])
 }

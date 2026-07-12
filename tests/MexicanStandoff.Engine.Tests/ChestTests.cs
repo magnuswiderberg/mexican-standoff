@@ -8,8 +8,8 @@ public class ChestTests
         var state = TestGame.State(("a", 2, 0, 0), ("b", 2, 0, 0));
         var result = TestGame.Resolve(state, ("a", TestGame.Chest()), ("b", TestGame.Dodge));
 
-        Assert.Equal(1, result.NewState.Player("a").Gold);
-        Assert.Contains(result.Reveal, s => s is RevealStep.ChestResolved(0, _, "a"));
+        Assert.Equal(2, result.NewState.Player("a").Gold);
+        Assert.Contains(result.Reveal, s => s is RevealStep.ChestResolved(0, _, "a", 2));
     }
 
     [Fact]
@@ -21,7 +21,7 @@ public class ChestTests
 
         Assert.Equal(0, result.NewState.Player("a").Gold);
         Assert.Equal(0, result.NewState.Player("b").Gold);
-        Assert.Contains(result.Reveal, s => s is RevealStep.ChestResolved(0, _, null));
+        Assert.Contains(result.Reveal, s => s is RevealStep.ChestResolved(0, _, null, _));
     }
 
     [Fact]
@@ -33,7 +33,7 @@ public class ChestTests
             state, ("a", TestGame.Chest()), ("b", TestGame.Chest()), ("c", TestGame.Attack("a")));
 
         Assert.Equal(0, result.NewState.Player("a").Gold);
-        Assert.Equal(1, result.NewState.Player("b").Gold);
+        Assert.Equal(2, result.NewState.Player("b").Gold);
     }
 
     [Fact]
@@ -45,6 +45,20 @@ public class ChestTests
         var b = result.NewState.Player("b");
         Assert.Equal(1, b.Hp);
         Assert.Equal(0, b.Gold);
+    }
+
+    [Fact]
+    public void GoldPerChest_ScalesTheGrab_AndCanWinTheGame()
+    {
+        // Legacy economy (chest=1, win=3): a grab pays 1 bar, and the grab
+        // that reaches the target ends the game.
+        var parameters = GameParameters.Default with { GoldPerChest = 1, GoldToWin = 3 };
+        var state = TestGame.State(parameters, ("a", 2, 0, 2), ("b", 2, 0, 0));
+        var result = TestGame.Resolve(state, ("a", TestGame.Chest()), ("b", TestGame.Dodge));
+
+        Assert.Equal(3, result.NewState.Player("a").Gold);
+        Assert.Contains(result.Reveal, s => s is RevealStep.ChestResolved(0, _, "a", 1));
+        Assert.Equal(WinReason.GoldTarget, result.WinReason);
     }
 
     [Fact]
@@ -61,7 +75,7 @@ public class ChestTests
             ("d", TestGame.Dodge),
             ("e", TestGame.Dodge));
 
-        Assert.Equal(1, result.NewState.Player("a").Gold);
+        Assert.Equal(2, result.NewState.Player("a").Gold);
         Assert.Equal(0, result.NewState.Player("b").Gold);
         Assert.Equal(0, result.NewState.Player("c").Gold);
     }

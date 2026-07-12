@@ -1,3 +1,4 @@
+using MexicanStandoff.Server.Contracts;
 using Microsoft.AspNetCore.SignalR;
 
 namespace MexicanStandoff.Server.IntegrationTests;
@@ -60,6 +61,157 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
     }
 
     [Fact]
+    public async Task Join_Simultaneous_SamePreferredAvatar_NeverDuplicates()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+
+        // A full game's worth of connections race for the same avatar. Joins
+        // serialize on the session lock, so exactly one wins the preference and
+        // the rest fall back to a free portrait — no duplicates, ever.
+        await Task.WhenAll(Enumerable.Range(1, 8).Select(async i =>
+        {
+            await using var phone = await GameClient.ConnectAsync(_factory);
+            await phone.Join(code, $"Player {i}", "viuda");
+        }));
+
+        var view = await client.Watch(code);
+        var avatars = view.Lobby.Players.Select(p => p.Avatar).ToArray();
+        Assert.Equal(8, avatars.Length);
+        Assert.Equal(8, avatars.Distinct().Count());
+        Assert.Contains("viuda", avatars);
+    }
+
+    [Fact]
+    public async Task CreateGame_WithSelectionTimer_OverridesConfigAndAutoResolves()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        // The factory's configured timer is 0 (off) — the per-game setting must win.
+        var code = await client.CreateGame(new CreateGameSettings(SelectionTimerSeconds: 1));
+        await client.Join(code, "Anna");
+        await client.Join(code, "Bob");
+
+        await client.Start(code);
+        var round = await client.NextRound();
+        Assert.NotNull(round.Deadline);
+
+        // Nobody submits: the deadline hits and the round resolves with auto-Dodge.
+        var resolved = await client.NextResolved();
+        Assert.All(resolved.Snapshot.Players, p => Assert.True(p.IsAlive));
+        Assert.NotNull(resolved.NextDeadline);
+    }
+
+    [Fact]
+    public async Task Leave_RemovesTheSeat_AndLaterJoinsGetFreshIds()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        await client.Join(code, "Anna");
+        var bob = await client.Join(code, "Bob");
+
+        await client.Leave(code, bob.PlayerToken);
+        LobbyView lobby = null!;
+        for (var i = 0; i < 3; i++) // 2 joins + 1 leave
+            lobby = await client.NextLobby();
+        Assert.Equal(["Anna"], lobby.Players.Select(p => p.Name).ToArray());
+
+        // The freed seat's token is dead and its id is never reissued.
+        await Assert.ThrowsAsync<HubException>(() => client.Leave(code, bob.PlayerToken));
+        var cleo = await client.Join(code, "Cleo");
+        Assert.NotEqual(bob.PlayerId, cleo.PlayerId);
+    }
+
+    [Fact]
+    public async Task Kick_OnlyTheHostCanRemoveOtherPlayers()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        var anna = await client.Join(code, "Anna"); // first seat = host
+        var bob = await client.Join(code, "Bob");
+        var cleo = await client.Join(code, "Cleo");
+
+        await Assert.ThrowsAsync<HubException>(() => client.Kick(code, bob.PlayerToken, cleo.PlayerId));
+        await Assert.ThrowsAsync<HubException>(() => client.Kick(code, anna.PlayerToken, anna.PlayerId));
+
+        await client.Kick(code, anna.PlayerToken, bob.PlayerId);
+        LobbyView lobby = null!;
+        for (var i = 0; i < 4; i++) // 3 joins + 1 kick
+            lobby = await client.NextLobby();
+        Assert.Equal(["Anna", "Cleo"], lobby.Players.Select(p => p.Name).ToArray());
+    }
+
+    [Fact]
+    public async Task Kick_FromTheMonitor_NeedsNoToken_AndCanRemoveTheHost()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        var anna = await client.Join(code, "Anna"); // host
+        await client.Join(code, "Bob");
+
+        // A tokenless kick is the monitor's alone: rejected from a connection
+        // that has not registered as the monitor.
+        await Assert.ThrowsAsync<HubException>(() => client.Kick(code, null, anna.PlayerId));
+
+        await client.WatchAsMonitor(code);
+        await client.Kick(code, null, anna.PlayerId);
+        LobbyView lobby = null!;
+        for (var i = 0; i < 3; i++) // 2 joins + 1 kick
+            lobby = await client.NextLobby();
+        Assert.Equal(["Bob"], lobby.Players.Select(p => p.Name).ToArray());
+    }
+
+    [Fact]
+    public async Task Kick_MidGame_ForcesAResign_AndOnlyHostOrMonitorMayDoIt()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        var anna = await client.Join(code, "Anna"); // host
+        var bob = await client.Join(code, "Bob");
+        var cleo = await client.Join(code, "Cleo");
+        await client.Start(code);
+        await client.NextRound();
+
+        // A non-host player cannot kick mid-game.
+        var ex = await Assert.ThrowsAsync<HubException>(() => client.Kick(code, bob.PlayerToken, cleo.PlayerId));
+        Assert.Contains("host", ex.Message);
+
+        // Nor can an unregistered connection kick tokenless by pretending to be the monitor.
+        await Assert.ThrowsAsync<HubException>(() => client.Kick(code, null, cleo.PlayerId));
+
+        // The monitor (no token) kicks Cleo: her dodge-out locks in immediately,
+        // and the broadcast flags her resigned so every device shows it at once.
+        await client.WatchAsMonitor(code);
+        await client.Kick(code, null, cleo.PlayerId);
+        var locked = await client.NextLock();
+        Assert.Equal(1, locked.LockedCount);
+        Assert.Contains(cleo.PlayerId, locked.ResignedPlayerIds);
+
+        await client.Submit(code, anna.PlayerToken, Actions.Load);
+        await client.Submit(code, bob.PlayerToken, Actions.Load);
+        var resolved = await client.NextResolved();
+
+        // Kicked = forced resign: eliminated at resolution, gold abandoned.
+        Assert.Contains(resolved.Reveal, s => s.Type == "playerResigned" && s.PlayerId == cleo.PlayerId);
+        Assert.False(resolved.Snapshot.Players.Single(p => p.Id == cleo.PlayerId).IsAlive);
+        Assert.True(resolved.Snapshot.IsDuel); // Anna and Bob fight on
+    }
+
+    [Fact]
+    public async Task Leave_AfterStart_IsRejected()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        await client.Join(code, "Anna");
+        var bob = await client.Join(code, "Bob");
+        await client.Start(code);
+        await client.NextRound();
+
+        // Seats are fixed once the game starts — leaving mid-game is resigning
+        // (and kicking is a forced resign, covered by the mid-game kick test).
+        await Assert.ThrowsAsync<HubException>(() => client.Leave(code, bob.PlayerToken));
+    }
+
+    [Fact]
     public async Task StartGame_BroadcastsFirstRound()
     {
         await using var client = await GameClient.ConnectAsync(_factory);
@@ -103,7 +255,7 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
         Assert.Null(resolved.WinnerIds);
         Assert.All(resolved.Snapshot.Players.Where(p => p.Id != cleo.PlayerId),
             p => Assert.Equal(1, p.Bullets));
-        Assert.Equal(1, resolved.Snapshot.Players.Single(p => p.Id == cleo.PlayerId).Gold);
+        Assert.Equal(2, resolved.Snapshot.Players.Single(p => p.Id == cleo.PlayerId).Gold);
         Assert.Contains(resolved.Reveal, s => s.Type == "actionsRevealed");
         Assert.Contains(resolved.Reveal, s => s.Type == "chestResolved" && s.ChestWinnerId == cleo.PlayerId);
     }
@@ -168,16 +320,18 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
         await client.Start(code);
         var round = await client.NextRound();
         Assert.True(round.Snapshot.IsDuel);
+        Assert.Equal(0, round.Snapshot.DuelVolley);
 
         // Sequence 1: Anna arms up and lands a hit; Bob farms the chest.
         await client.SubmitSequence(code, anna.PlayerToken, Actions.Load, Actions.Load, Actions.Attack(bob.PlayerId));
         await client.SubmitSequence(code, bob.PlayerToken, Actions.Chest(0), Actions.Chest(0), Actions.Chest(0));
         var resolved = await client.NextResolved();
         Assert.Null(resolved.WinnerIds);
-        Assert.Equal(2, resolved.Snapshot.Players.Single(p => p.Id == bob.PlayerId).Gold);
+        Assert.Equal(1, resolved.Snapshot.DuelVolley);
+        Assert.Equal(4, resolved.Snapshot.Players.Single(p => p.Id == bob.PlayerId).Gold);
         Assert.Equal(1, resolved.Snapshot.Players.Single(p => p.Id == bob.PlayerId).Hp);
 
-        // Sequence 2: Anna finishes it before Bob can grab his third bar.
+        // Sequence 2: Anna finishes it before Bob's chest run reaches the target.
         await client.SubmitSequence(code, anna.PlayerToken, Actions.Attack(bob.PlayerId), Actions.Load, Actions.Load);
         await client.SubmitSequence(code, bob.PlayerToken, Actions.Chest(0), Actions.Chest(0), Actions.Chest(0));
         resolved = await client.NextResolved();
@@ -234,17 +388,15 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
         await Assert.ThrowsAsync<HubException>(() => client.Watch("XXXX"));
     }
 
-    [Fact]
-    public async Task Rematch_StartsAFreshGameWithTheSameSeats()
+    /// <summary>Plays a 2-player game to a winner (Anna kills Bob over two duel volleys).</summary>
+    private static async Task<(JoinResult Anna, JoinResult Bob)> PlayTwoPlayerGameToWinner(
+        GameClient client, string code)
     {
-        await using var client = await GameClient.ConnectAsync(_factory);
-        var code = await client.CreateGame();
         var anna = await client.Join(code, "Anna");
         var bob = await client.Join(code, "Bob");
         await client.Start(code);
         await client.NextRound();
 
-        // Fast finish: Anna kills Bob over two sequences.
         await client.SubmitSequence(code, anna.PlayerToken, Actions.Load, Actions.Load, Actions.Attack(bob.PlayerId));
         await client.SubmitSequence(code, bob.PlayerToken, Actions.Dodge, Actions.Dodge, Actions.Load);
         await client.NextResolved();
@@ -252,8 +404,39 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
         await client.SubmitSequence(code, bob.PlayerToken, Actions.Load, Actions.Load, Actions.Dodge);
         var final = await client.NextResolved();
         Assert.NotNull(final.WinnerIds);
+        return (anna, bob);
+    }
+
+    [Fact]
+    public async Task Rematch_ReturnsEveryoneToTheLobby_WhereLeavingIsPossible()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        var (_, bob) = await PlayTwoPlayerGameToWinner(client, code);
 
         await client.Rematch(code);
+        var lobby = await client.NextReturnedToLobby();
+        Assert.Equal(["Anna", "Bob"], lobby.Players.Select(p => p.Name).ToArray());
+        Assert.True(lobby.CanStart);
+
+        // Nobody is forced into the next game — Bob opts out.
+        await client.Leave(code, bob.PlayerToken);
+        for (var i = 0; i < 3; i++) // 2 joins + 1 leave
+            lobby = await client.NextLobby();
+        Assert.Equal(["Anna"], lobby.Players.Select(p => p.Name).ToArray());
+        Assert.False(lobby.CanStart);
+    }
+
+    [Fact]
+    public async Task Rematch_ThenStart_BeginsAFreshGame()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        await PlayTwoPlayerGameToWinner(client, code);
+
+        await client.Rematch(code);
+        await client.NextReturnedToLobby();
+        await client.Start(code);
         var round = await client.NextRound();
 
         Assert.Equal(0, round.Snapshot.RoundNumber);
@@ -264,6 +447,127 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
             Assert.Equal(0, p.Bullets);
             Assert.Equal(0, p.Gold);
         });
+    }
+
+    [Fact]
+    public async Task Rematch_IsMonitorOnly_WhileAMonitorIsWatching()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        await PlayTwoPlayerGameToWinner(client, code);
+
+        await using var monitor = await GameClient.ConnectAsync(_factory);
+        await monitor.WatchAsMonitor(code);
+        Assert.True(await client.NextMonitorPresence());
+        Assert.True((await client.Watch(code)).HasMonitor); // late hydrators see it too
+
+        // Phones can no longer trigger the rematch...
+        var ex = await Assert.ThrowsAsync<HubException>(() => client.Rematch(code));
+        Assert.Contains("monitor", ex.Message);
+
+        // ...but the monitor can.
+        await monitor.Rematch(code);
+        await client.NextReturnedToLobby();
+    }
+
+    [Fact]
+    public async Task Rematch_FromPhones_WorksAgain_AfterTheMonitorDisconnects()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        await PlayTwoPlayerGameToWinner(client, code);
+
+        var monitor = await GameClient.ConnectAsync(_factory);
+        await monitor.WatchAsMonitor(code);
+        Assert.True(await client.NextMonitorPresence());
+
+        await monitor.DisposeAsync();
+        Assert.False(await client.NextMonitorPresence());
+
+        await client.Rematch(code);
+        await client.NextReturnedToLobby();
+    }
+
+    [Fact]
+    public async Task StopGame_BroadcastsToEveryone_AndKillsTheSession()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        var anna = await client.Join(code, "Anna");
+        await client.Join(code, "Bob");
+        await client.Join(code, "Cleo");
+        await client.Start(code);
+        await client.NextRound();
+
+        await client.Stop(code);
+        await client.NextStopped();
+
+        // The session is terminal: no more actions, no joins, no rematch.
+        var ex = await Assert.ThrowsAsync<HubException>(
+            () => client.Submit(code, anna.PlayerToken, Actions.Load));
+        Assert.Contains("not waiting for actions", ex.Message);
+        ex = await Assert.ThrowsAsync<HubException>(() => client.Join(code, "Dora"));
+        Assert.Contains("stopped", ex.Message);
+        ex = await Assert.ThrowsAsync<HubException>(() => client.Rematch(code));
+        Assert.Contains("stopped", ex.Message);
+
+        // A late device hydrating the game sees the stopped phase.
+        var view = await client.Watch(code);
+        Assert.Equal("Stopped", view.Phase);
+
+        // A second stop click racing the first is a no-op, not an error.
+        await client.Stop(code);
+    }
+
+    [Fact]
+    public async Task Resign_DodgesOutTheRound_ThenLeavesTheGame()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        var anna = await client.Join(code, "Anna");
+        var bob = await client.Join(code, "Bob");
+        var cleo = await client.Join(code, "Cleo");
+        await client.Start(code);
+        await client.NextRound();
+
+        await client.Resign(code, anna.PlayerToken);
+        var locked = await client.NextLock();
+        Assert.Equal(1, locked.LockedCount);
+
+        // Resigned players cannot act anymore.
+        var ex = await Assert.ThrowsAsync<HubException>(
+            () => client.Submit(code, anna.PlayerToken, Actions.Load));
+        Assert.Contains("resigned", ex.Message);
+
+        await client.Submit(code, bob.PlayerToken, Actions.Load);
+        await client.Submit(code, cleo.PlayerToken, Actions.Load);
+        var resolved = await client.NextResolved();
+
+        // Anna dodged the volley, then walked: eliminated, no future rounds.
+        Assert.Contains(resolved.Reveal, s => s.Type == "playerResigned" && s.PlayerId == anna.PlayerId);
+        Assert.False(resolved.Snapshot.Players.Single(p => p.Id == anna.PlayerId).IsAlive);
+        Assert.True(resolved.Snapshot.IsDuel); // Bob and Cleo fight on
+    }
+
+    [Fact]
+    public async Task Resign_DuringTheDuel_HandsTheOpponentTheWin()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        var anna = await client.Join(code, "Anna");
+        var bob = await client.Join(code, "Bob");
+        await client.Start(code);
+        var round = await client.NextRound();
+        Assert.True(round.Snapshot.IsDuel);
+
+        // Anna resigns; her all-Dodge sequence is locked in, so Bob's submission
+        // resolves the volley. She walks after step 1 — Bob is last standing.
+        await client.Resign(code, anna.PlayerToken);
+        await client.SubmitSequence(code, bob.PlayerToken, Actions.Chest(0), Actions.Chest(0), Actions.Chest(0));
+        var resolved = await client.NextResolved();
+
+        Assert.Equal([bob.PlayerId], resolved.WinnerIds);
+        Assert.Equal("LastStanding", resolved.WinReason);
     }
 }
 

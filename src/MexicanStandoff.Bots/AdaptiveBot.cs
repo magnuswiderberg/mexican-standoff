@@ -1,6 +1,6 @@
 using MexicanStandoff.Engine;
 
-namespace MexicanStandoff.Simulation.Bots;
+namespace MexicanStandoff.Bots;
 
 /// <summary>
 /// Heuristic all-rounder: races to the chest when close to winning, hunts the
@@ -16,15 +16,16 @@ public sealed class AdaptiveBot : IBot
         var opponents = BotHelpers.Opponents(state, myId);
         var armedOpponents = opponents.Count(p => p.Bullets > 0);
         var goldToWin = state.Parameters.GoldToWin;
+        var oneGrabAway = goldToWin - state.Parameters.GoldPerChest;
 
-        // One bar from winning: go for it, but hedge against being shot off the chest.
-        if (me.Gold == goldToWin - 1 && state.ChestCount > 0)
+        // One grab from winning: go for it, but hedge against being shot off the chest.
+        if (me.Gold >= oneGrabAway && state.ChestCount > 0)
             return armedOpponents == 0 || rng.NextDouble() < 0.6
                 ? BotHelpers.RandomChest(state, rng)
                 : PlayerAction.Dodge.Instance;
 
         // Someone else is about to win: stop them if we can.
-        var leader = opponents.Where(p => p.Gold >= goldToWin - 1).OrderByDescending(p => p.Gold).FirstOrDefault();
+        var leader = opponents.Where(p => p.Gold >= oneGrabAway).OrderByDescending(p => p.Gold).FirstOrDefault();
         if (leader is not null && me.Bullets > 0)
             return new PlayerAction.Attack(leader.Id);
 

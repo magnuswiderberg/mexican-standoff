@@ -1,6 +1,6 @@
 using MexicanStandoff.Engine;
 
-namespace MexicanStandoff.Simulation.Bots;
+namespace MexicanStandoff.Bots;
 
 /// <summary>Dodges whenever anyone is armed; loads and chests only when it is safe.</summary>
 public sealed class TurtleBot : IBot

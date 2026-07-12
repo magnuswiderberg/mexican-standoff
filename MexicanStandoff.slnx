@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/MexicanStandoff.Bots/MexicanStandoff.Bots.csproj" />
     <Project Path="src/MexicanStandoff.Engine/MexicanStandoff.Engine.csproj" />
     <Project Path="src/MexicanStandoff.Server/MexicanStandoff.Server.csproj" />
     <Project Path="src/MexicanStandoff.Simulation/MexicanStandoff.Simulation.csproj" />

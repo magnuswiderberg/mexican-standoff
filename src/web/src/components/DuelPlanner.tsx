@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { ActionDto, ActionType, GameSnapshot } from '../types'
 import { accentOf } from '../avatars'
+import { AttackIcon, BulletIcon, ChestIcon, DodgeIcon, LoadIcon } from './icons'
 
 /**
  * Final Duel: program a full sequence of actions up front. Legality mirrors
@@ -45,13 +47,13 @@ export function DuelPlanner({
     return bullets
   }
 
-  const optionsFor = (stepIndex: number): { type: ActionType; icon: string; ok: boolean }[] => {
+  const optionsFor = (stepIndex: number): { type: ActionType; icon: ReactNode; ok: boolean }[] => {
     const bullets = bulletsBefore(stepIndex)
     return [
-      { type: 'dodge', icon: '💨', ok: true },
-      { type: 'attack', icon: '🔫', ok: bullets >= 1 },
-      { type: 'load', icon: '🔺', ok: bullets < snapshot.maxBullets },
-      { type: 'chest', icon: '💰', ok: snapshot.chestCount > 0 },
+      { type: 'dodge', icon: <DodgeIcon />, ok: true },
+      { type: 'attack', icon: <AttackIcon />, ok: bullets >= 1 },
+      { type: 'load', icon: <LoadIcon />, ok: bullets < snapshot.maxBullets },
+      { type: 'chest', icon: <ChestIcon />, ok: snapshot.chestCount > 0 },
     ]
   }
 
@@ -78,7 +80,8 @@ export function DuelPlanner({
     setSteps(next)
   }
 
-  const complete = steps.every((s) => s !== null)
+  const missing = steps.filter((s) => s === null).length
+  const complete = missing === 0
 
   const lockIn = () => {
     if (!complete || submitting) return
@@ -100,14 +103,24 @@ export function DuelPlanner({
   return (
     <div className="picker duel-planner">
       <div className="duel-banner">
-        ⚔️ Final Duel vs <strong style={{ color: accentOf(opponent.avatar) }}>{opponent.name}</strong>
+        ⚔️ {snapshot.players.length === 2 ? 'Duel' : 'Final Duel'} vs{' '}
+        <strong style={{ color: accentOf(opponent.avatar) }}>{opponent.name}</strong>
         {snapshot.suddenDeath && <div className="sudden-death">☠️ Sudden death — free bullet, no chest!</div>}
       </div>
-      <p className="hint">Program all {length} moves, then watch them play out.</p>
+      <p className="hint">
+        Program all {length} moves, then watch them play out. Attack needs a bullet in the gun —
+        Load first. The count next to each move shows your bullets going into it.
+      </p>
 
       {steps.map((chosen, i) => (
         <div key={i} className="duel-step">
-          <span className="duel-step-no">{i + 1}</span>
+          <span className="duel-step-no">
+            {i + 1}
+            <span className="duel-step-ammo" title="Bullets in your gun at this move">
+              <BulletIcon />
+              {bulletsBefore(i)}
+            </span>
+          </span>
           <div className="duel-options">
             {optionsFor(i).map((opt) => (
               <button
@@ -124,6 +137,15 @@ export function DuelPlanner({
       ))}
 
       {error && <div className="error">{error}</div>}
+
+      {/* Say why Lock in is greyed out — dimming alone reads as "broken button". */}
+      {!complete && (
+        <p className="hint center-text">
+          {missing === length
+            ? 'Program your moves first.'
+            : `${missing} more ${missing === 1 ? 'move' : 'moves'} to program.`}
+        </p>
+      )}
 
       <button className="primary lock-in" disabled={!complete || submitting} onClick={lockIn}>
         {submitting ? 'Locking in…' : 'Lock in sequence'}

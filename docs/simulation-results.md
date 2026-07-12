@@ -71,6 +71,44 @@ better and gives new players one safe round to find their feet. A loaded-gun
 start is a good candidate for the v2 asymmetric/variant setups — mechanically it
 already works via `StartingBullets`.
 
+## Variant run: rescaled gold economy — chest pays more, target scales (2026-07-12)
+
+Run: `... --games 1000` with new `GoldPerChest` parameter and a `lootLost`
+column (share of games where loot-split rounding destroyed gold / average gold
+destroyed as a share of the win target). Motivation: with chest=1/win=3, a
+2-shooter kill of a 1-bar player destroys the whole bar.
+
+Compared configs with identical grabs-to-win: baseline (1/3), **2/6**, **3/9**.
+
+| Players | baseline lootLost | chest=2 win=6 | chest=3 win=9 |
+|--------:|------------------:|--------------:|--------------:|
+| 3 | 20% / 6.7% | **0% / 0.0%** | 20% / 2.2% |
+| 4 | 20% / 6.6% | **0% / 0.0%** | 20% / 2.2% |
+| 5 | 19% / 7.7% | **4% / 0.8%** | 19% / 2.3% |
+| 6 | 55% / 34.6% | 38% / 8.9% | 35% / 4.8% |
+| 8 | 92% / 96.0% | 54% / 18.4% | 80% / 20.0% |
+
+- **chest=2/win=6 eliminates rounding loss at 3–5 players.** Kills are almost
+  always 2-shooter (HP 2) and chest grabs keep gold totals even, so 2-way splits
+  are exact. At 8p the baseline destroys ~a full win-target of gold per game;
+  2/6 cuts that ~5×.
+- **Pacing is unchanged at small tables and *better* at large ones**: 8p drops
+  16 → 12 avg rounds (~7.8 → ~6.1 min) because looted gold recycles into the
+  race instead of evaporating.
+- **Balance improves at 8p**: turtle dominance falls 38% → 15% and win rates
+  spread out (adaptive 19%, turtle 15%, aggressive 11%) — gold destruction was
+  quietly subsidizing the turtle. Chest-rushing stays punished (≤10%).
+- **3/9 is strictly worse than 2/6** below 6 players (odd totals reappear) and
+  no better at 8; bigger numbers for nothing.
+- 2p untouched (duel loot barely exists).
+
+**Recommendation: adopt chest=2 / win=6** pending a real playtest — the one
+cost is presentational ("first to 6 bars", two-bar grab animations).
+
+**Adopted as the default (2026-07-12)**: `GoldPerChest = 2`, `GoldToWin = 6`.
+The simulation baseline now uses these values; `chest=1 win=3` remains as a
+legacy comparison config.
+
 ## Caveats
 
 - Bots are simple heuristics; humans bluff, spite-shoot and meta-game. Treat

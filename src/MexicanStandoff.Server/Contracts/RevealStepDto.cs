@@ -20,6 +20,7 @@ public sealed record RevealStepDto(
     int? ChestIndex = null,
     IReadOnlyList<string>? ContenderIds = null,
     string? ChestWinnerId = null,
+    int? GoldGained = null,
     IReadOnlyList<string>? LooterIds = null,
     int? GoldPerLooter = null,
     int? GoldLost = null,
@@ -44,10 +45,13 @@ public sealed record RevealStepDto(
             PlayerId: s.PlayerId, BulletsNow: s.BulletsNow),
 
         RevealStep.ChestResolved s => new RevealStepDto("chestResolved",
-            ChestIndex: s.ChestIndex, ContenderIds: s.ContenderIds, ChestWinnerId: s.WinnerId),
+            ChestIndex: s.ChestIndex, ContenderIds: s.ContenderIds, ChestWinnerId: s.WinnerId, GoldGained: s.GoldGained),
 
         RevealStep.PlayerEliminated s => new RevealStepDto("playerEliminated",
             PlayerId: s.PlayerId, LooterIds: s.LooterIds, GoldPerLooter: s.GoldPerLooter, GoldLost: s.GoldLost),
+
+        RevealStep.PlayerResigned s => new RevealStepDto("playerResigned",
+            PlayerId: s.PlayerId, GoldLost: s.GoldLost),
 
         RevealStep.ActionFizzled s => new RevealStepDto("actionFizzled",
             PlayerId: s.PlayerId, Action: ActionDto.From(s.Original)),

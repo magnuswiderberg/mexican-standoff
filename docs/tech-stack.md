@@ -14,7 +14,7 @@ great local dev experience, snappy realtime gameplay.
 | Infra as code | **Bicep** | One Web App on the existing App Service plan. WebSockets enabled. |
 | Unit tests | **xUnit** on the engine | Exhaustive rules coverage; the engine is pure so tests are fast and deterministic. |
 | Integration tests | **xUnit + WebApplicationFactory + SignalR client** | Drive full games through the real hub in-process. TestContainers joins the party when Cosmos is introduced (v2). |
-| Simulation | **Console app** referencing the engine | Bots with different strategies play thousands of games across parameter grids; outputs game-length/win-rate stats. |
+| Simulation | **Console app** referencing the engine | Bots with different strategies (shared `MexicanStandoff.Bots` library, also used for the server's dev lobby bots) play thousands of games across parameter grids; outputs game-length/win-rate stats. |
 
 ## Architecture
 
@@ -42,8 +42,11 @@ great local dev experience, snappy realtime gameplay.
   This is how "phones are the monitor" works — the Monitor page is just a
   bigger renderer of the same script.
 - **Game identity**: 4–5 letter game code (in the QR URL). Players get a
-  secret player token stored in `localStorage`, so a refresh or dropped
-  connection reconnects them to their seat.
+  secret player token, so a refresh or dropped connection reconnects them to
+  their seat. It lives per tab in `sessionStorage` (tabs are isolated players —
+  a second tab on one browser joins as a new player) with a `localStorage`
+  backup for the closed-tab QR-rescan rejoin; a `BroadcastChannel` probe stops
+  a new tab from adopting the backup while the owning tab is still alive.
 - **Scale-out note**: in-memory state pins a game to one instance. Fine for a
   hobby project on a single-instance plan. If scale-out is ever needed:
   Azure SignalR Service + moving state to Cosmos/Redis.
@@ -53,6 +56,7 @@ great local dev experience, snappy realtime gameplay.
 ```
 src/
   MexicanStandoff.Engine/          # pure game rules (no dependencies)
+  MexicanStandoff.Bots/            # bot strategies (depends only on Engine); shared by Simulation + Server dev bots
   MexicanStandoff.Server/          # ASP.NET Core, GameHub, serves the SPA
   MexicanStandoff.Simulation/      # bot harness for parameter tuning
   web/                             # React + Vite + TS (player + monitor pages)
@@ -66,13 +70,23 @@ docs/
 
 ## Local development
 
-No Docker needed for MVP (no database):
+No Docker needed for MVP (no database). Three ways to run the frontend,
+for three situations:
 
-- `dotnet run` in `MexicanStandoff.Server` (hub + API).
-- `npm run dev` in `src/web` — Vite dev server proxies `/hub` and `/api`
-  to the .NET server, giving HMR on the frontend.
-- Multiple browser tabs (or phone + `dotnet dev-tunnels` / local IP) simulate a
-  party. A `?debug` lobby mode that seeds bot players is worth adding early.
+1. **Active UI work — `npm run dev`** in `src/web`, alongside `dotnet run` in
+   `MexicanStandoff.Server`. Vite serves on :5173 with hot reload and proxies
+   `/hub` (WebSockets) to the .NET server on :5068 — every save shows up
+   instantly, no build step.
+2. **Refresh what the server serves — `npm run build`** in `src/web`. This
+   type-checks and emits the SPA into the server's `wwwroot` (gitignored).
+   Static files are read from disk per request, so a running `dotnet run`
+   picks the new build up immediately — no server restart. Do this after UI
+   changes when testing the "real" single-server app, e.g. from phones.
+3. **Shipping — `dotnet publish`** runs the SPA build automatically as part of
+   publishing; no need to remember `npm run build` in a release pipeline.
+
+Multiple browser tabs (or phone + `dotnet dev-tunnels` / local IP) simulate a
+party. A `?debug` lobby mode that seeds bot players is worth adding early.
 
 When Cosmos arrives (v2): Cosmos DB Linux emulator in Docker for local dev,
 TestContainers for integration tests — as planned in the initial prompt.

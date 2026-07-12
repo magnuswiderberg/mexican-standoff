@@ -13,10 +13,16 @@ namespace MexicanStandoff.Server.IntegrationTests;
 public sealed class StandoffServerFactory : WebApplicationFactory<Program>
 {
     public int SelectionTimerSeconds { get; init; }
+    public bool BotsEnabled { get; init; }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) =>
         builder.ConfigureServices(services =>
-            services.Configure<GameOptions>(o => o.SelectionTimerSeconds = SelectionTimerSeconds));
+            services.Configure<GameOptions>(o =>
+            {
+                o.SelectionTimerSeconds = SelectionTimerSeconds;
+                o.Bots.Enabled = BotsEnabled;
+                o.Bots.ThinkMilliseconds = 0; // bots act immediately in tests
+            }));
 }
 
 /// <summary>
@@ -30,6 +36,9 @@ public sealed class GameClient : IAsyncDisposable
     private readonly Channel<RoundStartedView> _rounds = Channel.CreateUnbounded<RoundStartedView>();
     private readonly Channel<PlayerLockedView> _locks = Channel.CreateUnbounded<PlayerLockedView>();
     private readonly Channel<RoundResolvedView> _resolved = Channel.CreateUnbounded<RoundResolvedView>();
+    private readonly Channel<LobbyView> _returnedToLobby = Channel.CreateUnbounded<LobbyView>();
+    private readonly Channel<bool> _stopped = Channel.CreateUnbounded<bool>();
+    private readonly Channel<bool> _monitorPresence = Channel.CreateUnbounded<bool>();
 
     private GameClient(HubConnection hub)
     {
@@ -38,6 +47,9 @@ public sealed class GameClient : IAsyncDisposable
         hub.On<RoundStartedView>("RoundStarted", v => _rounds.Writer.TryWrite(v));
         hub.On<PlayerLockedView>("PlayerLocked", v => _locks.Writer.TryWrite(v));
         hub.On<RoundResolvedView>("RoundResolved", v => _resolved.Writer.TryWrite(v));
+        hub.On<LobbyView>("ReturnedToLobby", v => _returnedToLobby.Writer.TryWrite(v));
+        hub.On("GameStopped", () => _stopped.Writer.TryWrite(true));
+        hub.On<bool>("MonitorPresence", v => _monitorPresence.Writer.TryWrite(v));
     }
 
     public static async Task<GameClient> ConnectAsync(StandoffServerFactory factory)
@@ -54,22 +66,33 @@ public sealed class GameClient : IAsyncDisposable
         return client;
     }
 
-    public Task<string> CreateGame() => _hub.InvokeAsync<string>("CreateGame");
+    public Task<string> CreateGame(CreateGameSettings? settings = null) =>
+        _hub.InvokeAsync<string>("CreateGame", settings);
     public Task<JoinResult> Join(string code, string name, string? avatar = null) =>
         _hub.InvokeAsync<JoinResult>("JoinGame", code, name, avatar);
+    public Task Leave(string code, string token) => _hub.InvokeAsync("LeaveGame", code, token);
+    public Task Kick(string code, string? token, string targetId) =>
+        _hub.InvokeAsync("KickPlayer", code, token, targetId);
+    public Task AddBot(string code, string? token = null) => _hub.InvokeAsync("AddBot", code, token);
     public Task<GameView> Watch(string code) => _hub.InvokeAsync<GameView>("WatchGame", code);
+    public Task<GameView> WatchAsMonitor(string code) => _hub.InvokeAsync<GameView>("WatchAsMonitor", code);
     public Task<GameView> Reconnect(string code, string token) => _hub.InvokeAsync<GameView>("Reconnect", code, token);
     public Task Start(string code) => _hub.InvokeAsync("StartGame", code);
     public Task Submit(string code, string token, ActionDto action) =>
         _hub.InvokeAsync("SubmitAction", code, token, action);
     public Task SubmitSequence(string code, string token, params ActionDto[] sequence) =>
         _hub.InvokeAsync("SubmitDuelSequence", code, token, sequence);
+    public Task Resign(string code, string token) => _hub.InvokeAsync("Resign", code, token);
     public Task Rematch(string code) => _hub.InvokeAsync("Rematch", code);
+    public Task Stop(string code) => _hub.InvokeAsync("StopGame", code);
 
     public Task<LobbyView> NextLobby() => Next(_lobby);
     public Task<RoundStartedView> NextRound() => Next(_rounds);
     public Task<PlayerLockedView> NextLock() => Next(_locks);
     public Task<RoundResolvedView> NextResolved() => Next(_resolved);
+    public Task<LobbyView> NextReturnedToLobby() => Next(_returnedToLobby);
+    public Task NextStopped() => Next(_stopped);
+    public Task<bool> NextMonitorPresence() => Next(_monitorPresence);
 
     private static async Task<T> Next<T>(Channel<T> channel)
     {

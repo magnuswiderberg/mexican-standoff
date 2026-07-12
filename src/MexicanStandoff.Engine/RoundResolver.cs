@@ -3,11 +3,18 @@ namespace MexicanStandoff.Engine;
 /// <summary>
 /// Resolves one round using the simultaneous-volley model (docs/game-design.md):
 /// dodges → all attacks fire together → being hit cancels Load/Chest → loads →
-/// chests (strictly alone) → eliminations and loot → win check.
+/// chests (strictly alone) → eliminations and loot → resignations → win check.
 /// </summary>
 public static class RoundResolver
 {
-    public static RoundResult Resolve(GameState state, IReadOnlyDictionary<string, PlayerAction> actions)
+    /// <param name="resignedIds">
+    /// Players who resigned this round: they play their submitted action (a Dodge,
+    /// by the spec) and are then eliminated with no looters, gold abandoned.
+    /// </param>
+    public static RoundResult Resolve(
+        GameState state,
+        IReadOnlyDictionary<string, PlayerAction> actions,
+        IReadOnlyCollection<string>? resignedIds = null)
     {
         ValidateSubmission(state, actions);
 
@@ -88,10 +95,10 @@ public static class RoundResolver
             if (winner is not null)
             {
                 var w = players[winner];
-                players[winner] = w with { Gold = w.Gold + 1 };
+                players[winner] = w with { Gold = w.Gold + state.Parameters.GoldPerChest };
             }
 
-            reveal.Add(new RevealStep.ChestResolved(chest, contenders, winner));
+            reveal.Add(new RevealStep.ChestResolved(chest, contenders, winner, state.Parameters.GoldPerChest));
         }
 
         // Phase 6+7: eliminations and loot. Gold snapshots are taken before any
@@ -115,14 +122,29 @@ public static class RoundResolver
                 victimId, looters, share, goldAtDeath[victimId] - share * looters.Count));
         }
 
+        // Phase 7½: resignations. A resigner who survived the volley walks away —
+        // eliminated with no looters, gold abandoned (docs/game-design.md).
+        if (resignedIds is { Count: > 0 })
+        {
+            foreach (var (player, _) in seated)
+            {
+                if (!resignedIds.Contains(player.Id) || players[player.Id].Hp <= 0)
+                    continue;
+                var abandoned = players[player.Id].Gold;
+                players[player.Id] = players[player.Id] with { Hp = 0, Gold = 0 };
+                reveal.Add(new RevealStep.PlayerResigned(player.Id, abandoned));
+            }
+        }
+
         var newState = state with
         {
             Players = state.Players.Select(p => players[p.Id]).ToArray(),
             RoundNumber = state.RoundNumber + 1,
         };
 
-        // Phase 8: win check.
-        var (winners, reason) = WinEvaluator.Evaluate(newState, victims);
+        // Phase 8: win check. Nobody left alive (everyone shot each other, or
+        // every remaining player resigned) is mutual destruction: no winner.
+        var (winners, reason) = WinEvaluator.Evaluate(newState);
         if (winners is not null)
             reveal.Add(new RevealStep.GameEnded(winners, reason!.Value));
 

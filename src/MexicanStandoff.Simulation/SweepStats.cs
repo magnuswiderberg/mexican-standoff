@@ -12,11 +12,16 @@ public sealed class SweepStats
 
     public int Games { get; private set; }
     public int Timeouts { get; private set; }
+    public int GamesWithRoundingLoss { get; private set; }
+    public int TotalGoldLostToRounding { get; private set; }
 
     public void Add(GameOutcome outcome, IEnumerable<string> seatedStrategies)
     {
         Games++;
         _rounds.Add(outcome.Rounds);
+        TotalGoldLostToRounding += outcome.GoldLostToRounding;
+        if (outcome.GoldLostToRounding > 0)
+            GamesWithRoundingLoss++;
 
         foreach (var strategy in seatedStrategies)
             _seatsByStrategy[strategy] = _seatsByStrategy.GetValueOrDefault(strategy) + 1;
@@ -40,6 +45,13 @@ public sealed class SweepStats
     }
 
     public double TimeoutRate => (double)Timeouts / Games;
+
+    /// <summary>Share of games where the loot split's rounding lost at least one bar.</summary>
+    public double RoundingLossRate => (double)GamesWithRoundingLoss / Games;
+
+    /// <summary>Rounding losses as a share of the win target — comparable across rescaled economies.</summary>
+    public double AvgGoldLostShareOfTarget(int goldToWin) =>
+        (double)TotalGoldLostToRounding / Games / goldToWin;
 
     public IEnumerable<(WinReason Reason, double Share)> ReasonShares =>
         _reasons.OrderByDescending(kv => kv.Value)

@@ -1,12 +1,14 @@
 namespace MexicanStandoff.Server.Contracts;
 
-public sealed record PlayerSnapshot(string Id, string Name, string Avatar, int Hp, int Bullets, int Gold, bool IsAlive);
+public sealed record PlayerSnapshot(
+    string Id, string Name, string Avatar, int Hp, int Bullets, int Gold, bool IsAlive, bool IsResigned = false);
 
 public sealed record GameSnapshot(
     string Code,
     string Phase,
     int RoundNumber,
     bool IsDuel,
+    int DuelVolley,
     bool SuddenDeath,
     int ChestCount,
     int GoldToWin,
@@ -15,15 +17,24 @@ public sealed record GameSnapshot(
     int DuelSequenceLength,
     IReadOnlyList<PlayerSnapshot> Players);
 
-public sealed record LobbyPlayer(string Id, string Name, string Avatar);
+public sealed record LobbyPlayer(string Id, string Name, string Avatar, bool IsBot = false);
 
-public sealed record LobbyView(string Code, IReadOnlyList<LobbyPlayer> Players, bool CanStart);
+public sealed record LobbyView(
+    string Code,
+    IReadOnlyList<LobbyPlayer> Players,
+    bool CanStart,
+    bool BotsEnabled = false);
 
 public sealed record JoinResult(string PlayerId, string PlayerToken, LobbyView Lobby);
 
 public sealed record RoundStartedView(GameSnapshot Snapshot, DateTimeOffset? Deadline);
 
-public sealed record PlayerLockedView(string PlayerId, int LockedCount, int TotalExpected);
+public sealed record PlayerLockedView(
+    string PlayerId,
+    int LockedCount,
+    int TotalExpected,
+    IReadOnlyList<string> LockedPlayerIds,
+    IReadOnlyList<string> ResignedPlayerIds);
 
 public sealed record RoundResolvedView(
     IReadOnlyList<RevealStepDto> Reveal,
@@ -41,4 +52,5 @@ public sealed record GameView(
     string? PlayerId,
     bool HasSubmitted,
     IReadOnlyList<string>? WinnerIds,
-    string? WinReason);
+    string? WinReason,
+    bool HasMonitor = false);

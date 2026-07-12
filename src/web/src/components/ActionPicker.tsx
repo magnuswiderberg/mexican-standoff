@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { ActionDto, ActionType, GameSnapshot } from '../types'
 import { Avatar } from './PlayerBoard'
+import { AttackIcon, ChestIcon, DodgeIcon, LoadIcon } from './icons'
 
 interface CardSpec {
   type: ActionType
-  icon: string
+  icon: ReactNode
   label: string
   disabledReason: string | null
   needsTarget: 'player' | 'chest' | null
@@ -15,10 +17,10 @@ export function cardsFor(snapshot: GameSnapshot, playerId: string): CardSpec[] {
   const me = snapshot.players.find((p) => p.id === playerId)!
   const opponents = snapshot.players.filter((p) => p.isAlive && p.id !== playerId)
   return [
-    { type: 'dodge', icon: '💨', label: 'Dodge', disabledReason: null, needsTarget: null },
+    { type: 'dodge', icon: <DodgeIcon />, label: 'Dodge', disabledReason: null, needsTarget: null },
     {
       type: 'attack',
-      icon: '🔫',
+      icon: <AttackIcon />,
       label: 'Attack',
       disabledReason:
         me.bullets < 1 ? 'gun is empty' : opponents.length === 0 ? 'no one to shoot' : null,
@@ -26,14 +28,14 @@ export function cardsFor(snapshot: GameSnapshot, playerId: string): CardSpec[] {
     },
     {
       type: 'load',
-      icon: '🔺',
+      icon: <LoadIcon />,
       label: 'Load',
       disabledReason: me.bullets >= snapshot.maxBullets ? 'gun is full' : null,
       needsTarget: null,
     },
     {
       type: 'chest',
-      icon: '💰',
+      icon: <ChestIcon />,
       label: 'Chest',
       disabledReason: snapshot.chestCount === 0 ? 'no chest in play' : null,
       needsTarget: snapshot.chestCount > 1 ? 'chest' : null,
@@ -135,13 +137,24 @@ export function ActionPicker({
               className={`target ${chestIndex === i ? 'target-picked' : ''}`}
               onClick={() => setChestIndex(i)}
             >
-              💰 Chest {i + 1}
+              <ChestIcon /> Chest {i + 1}
             </button>
           ))}
         </div>
       )}
 
       {error && <div className="error">{error}</div>}
+
+      {/* Say why Lock in is greyed out — dimming alone reads as "broken button". */}
+      {!ready && (
+        <p className="hint center-text">
+          {pickedCard === null
+            ? 'Pick an action first.'
+            : pickedCard.needsTarget === 'player'
+              ? 'Pick who to shoot.'
+              : 'Pick a chest.'}
+        </p>
+      )}
 
       <button className="primary lock-in" disabled={!ready || submitting} onClick={lockIn}>
         {submitting ? 'Locking in…' : 'Lock in'}

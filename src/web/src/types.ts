@@ -17,6 +17,8 @@ export interface PlayerSnapshot {
   bullets: number
   gold: number
   isAlive: boolean
+  /** Resigned players stay in the game but auto-Dodge every round. */
+  isResigned: boolean
 }
 
 export interface GameSnapshot {
@@ -24,6 +26,8 @@ export interface GameSnapshot {
   phase: string
   roundNumber: number
   isDuel: boolean
+  /** Completed duel volleys (programmed sequences) — display volley is this + 1. */
+  duelVolley: number
   suddenDeath: boolean
   chestCount: number
   goldToWin: number
@@ -33,17 +37,27 @@ export interface GameSnapshot {
   players: PlayerSnapshot[]
 }
 
+/** Per-game settings sent with CreateGame; omitted fields fall back to server config. */
+export interface CreateGameSettings {
+  /** Seconds to pick an action; 0 disables the timer. */
+  selectionTimerSeconds?: number | null
+}
+
 export interface LobbyPlayer {
   id: string
   name: string
   /** Avatar key (see avatars.ts). */
   avatar: string
+  /** Dev bot seat — the server plays it. */
+  isBot: boolean
 }
 
 export interface LobbyView {
   code: string
   players: LobbyPlayer[]
   canStart: boolean
+  /** Dev-only: the server allows the host to add bot seats. */
+  botsEnabled: boolean
 }
 
 export interface JoinResult {
@@ -61,6 +75,10 @@ export interface PlayerLockedView {
   playerId: string
   lockedCount: number
   totalExpected: number
+  /** Everyone who has locked in so far — drives the per-tile ✓ badges. */
+  lockedPlayerIds: string[]
+  /** Resigned (or mid-game-kicked) players — shows the 🏳️ before the snapshot catches up. */
+  resignedPlayerIds: string[]
 }
 
 export type RevealStepType =
@@ -71,6 +89,7 @@ export type RevealStepType =
   | 'suddenDeathBullet'
   | 'chestResolved'
   | 'playerEliminated'
+  | 'playerResigned'
   | 'actionFizzled'
   | 'gameEnded'
 
@@ -91,6 +110,7 @@ export interface RevealStepDto {
   chestIndex?: number | null
   contenderIds?: string[] | null
   chestWinnerId?: string | null
+  goldGained?: number | null
   looterIds?: string[] | null
   goldPerLooter?: number | null
   goldLost?: number | null
@@ -106,7 +126,7 @@ export interface RoundResolvedView {
   winReason: string | null
 }
 
-export type ServerPhase = 'Lobby' | 'Selecting' | 'GameOver'
+export type ServerPhase = 'Lobby' | 'Selecting' | 'GameOver' | 'Stopped'
 
 export interface GameView {
   phase: ServerPhase
@@ -117,4 +137,6 @@ export interface GameView {
   hasSubmitted: boolean
   winnerIds: string[] | null
   winReason: string | null
+  /** A monitor page is watching — rematches start from the monitor, not the phones. */
+  hasMonitor: boolean
 }

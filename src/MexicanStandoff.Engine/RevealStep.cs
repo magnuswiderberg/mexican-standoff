@@ -35,8 +35,11 @@ public abstract record RevealStep
     /// <summary>Sudden death (Final Duel stalemate guard): a free bullet at sequence start.</summary>
     public sealed record SuddenDeathBullet(string PlayerId, int BulletsNow) : RevealStep;
 
-    /// <summary>Chest outcome. Winner is null when contested or when the only contender was hit.</summary>
-    public sealed record ChestResolved(int ChestIndex, IReadOnlyList<string> ContenderIds, string? WinnerId) : RevealStep;
+    /// <summary>
+    /// Chest outcome. Winner is null when contested or when the only contender
+    /// was hit; <paramref name="GoldGained"/> is what a winner takes (param).
+    /// </summary>
+    public sealed record ChestResolved(int ChestIndex, IReadOnlyList<string> ContenderIds, string? WinnerId, int GoldGained) : RevealStep;
 
     /// <summary>
     /// A player is wounded and out. Their gold is split evenly among the players
@@ -47,6 +50,12 @@ public abstract record RevealStep
         IReadOnlyList<string> LooterIds,
         int GoldPerLooter,
         int GoldLost) : RevealStep;
+
+    /// <summary>
+    /// A player resigned: they dodged through the volley and now walk away —
+    /// eliminated with no looters, their gold abandoned.
+    /// </summary>
+    public sealed record PlayerResigned(string PlayerId, int GoldLost) : RevealStep;
 
     /// <summary>Final Duel only: a programmed action became illegal and fizzled into a Dodge.</summary>
     public sealed record ActionFizzled(string PlayerId, PlayerAction Original) : RevealStep;

@@ -1,6 +1,6 @@
 using MexicanStandoff.Engine;
 
-namespace MexicanStandoff.Simulation.Bots;
+namespace MexicanStandoff.Bots;
 
 /// <summary>Goes for a chest every round; arms itself only when no chest exists (sudden death).</summary>
 public sealed class ChestRusherBot : IBot

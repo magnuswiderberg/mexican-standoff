@@ -11,7 +11,14 @@ public sealed record GameParameters
 
     /// <summary>Bullets in the gun at game start (capped at <see cref="MaxBullets"/>).</summary>
     public int StartingBullets { get; init; }
-    public int GoldToWin { get; init; } = 3;
+    public int GoldToWin { get; init; } = 6;
+
+    /// <summary>
+    /// Gold bars gained per successful chest grab. Scaled 2-per-grab / 6-to-win
+    /// (same three grabs as 1/3) so the common 2-shooter loot split is exact —
+    /// see docs/simulation-results.md.
+    /// </summary>
+    public int GoldPerChest { get; init; } = 2;
     public int MinPlayers { get; init; } = 2;
     public int MaxPlayers { get; init; } = 8;
 

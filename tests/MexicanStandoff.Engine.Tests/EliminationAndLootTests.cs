@@ -47,7 +47,7 @@ public class EliminationAndLootTests
     [Fact]
     public void LootedGold_CanWinTheGameInstantly()
     {
-        var state = TestGame.State(("a", 2, 1, 2), ("b", 1, 0, 1), ("c", 2, 0, 0));
+        var state = TestGame.State(("a", 2, 1, 5), ("b", 1, 0, 1), ("c", 2, 0, 0));
         var result = TestGame.Resolve(
             state, ("a", TestGame.Attack("b")), ("b", TestGame.Load), ("c", TestGame.Dodge));
 

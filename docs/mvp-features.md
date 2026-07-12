@@ -11,7 +11,7 @@ in MVP.)
 - [x] Create game → 4–5 letter game code + QR code (shown on whichever device created it, typically the Monitor page).
 - [x] Join via QR/URL/code; pick a name and an avatar (10 character portraits with accent colors, taken ones greyed out live; the server dedupes).
 - [x] Lobby: live player list on all devices; host (first player) or Monitor starts the game (2–8 players).
-- [x] Reconnect: player token in `localStorage` restores your seat after refresh/drop.
+- [x] Reconnect: player token in `sessionStorage` (+ `localStorage` backup for closed-tab rescans) restores your seat after refresh/drop; tabs are isolated players.
 
 ### 2. Core gameplay (engine)
 - [x] Full rules per [game-design.md](game-design.md): simultaneous-volley resolution, strictly-alone chests, loot-on-elimination with instant win.

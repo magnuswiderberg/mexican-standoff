@@ -5,6 +5,7 @@ public sealed record RoundResult
 {
     public required GameState NewState { get; init; }
     public required IReadOnlyList<RevealStep> Reveal { get; init; }
+    /// <summary>Null while the game continues; empty when it ended with no winner (mutual destruction).</summary>
     public IReadOnlyList<string>? WinnerIds { get; init; }
     public WinReason? WinReason { get; init; }
 

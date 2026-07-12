@@ -14,10 +14,10 @@ public class DuelResolverTests
             ("a", [TestGame.Load, TestGame.Load, TestGame.Attack("b")]),
             ("b", [TestGame.Chest(), TestGame.Chest(), TestGame.Chest()])));
 
-        // Steps 1-2: A loads twice, B grabs two bars. Step 3: A shoots, B's chest is cancelled.
+        // Steps 1-2: A loads twice, B grabs the chest twice. Step 3: A shoots, B's chest is cancelled.
         Assert.False(result.IsGameOver);
         Assert.Equal(1, result.NewState.Player("a").Bullets);
-        Assert.Equal(2, result.NewState.Player("b").Gold);
+        Assert.Equal(4, result.NewState.Player("b").Gold);
         Assert.Equal(1, result.NewState.Player("b").Hp);
         Assert.Equal(3, result.NewState.RoundNumber);
     }
@@ -65,7 +65,7 @@ public class DuelResolverTests
     [Fact]
     public void GoldTarget_EndsTheSequenceEarly()
     {
-        var state = TestGame.State(("a", 2, 0, 2), ("b", 2, 0, 0));
+        var state = TestGame.State(("a", 2, 0, 4), ("b", 2, 0, 0));
         var result = DuelResolver.Resolve(state, Seqs(
             ("a", [TestGame.Chest(), TestGame.Dodge, TestGame.Dodge]),
             ("b", [TestGame.Load, TestGame.Load, TestGame.Dodge])));
@@ -74,6 +74,29 @@ public class DuelResolverTests
         Assert.Equal(["a"], result.WinnerIds);
         Assert.Equal(WinReason.GoldTarget, result.WinReason);
         Assert.Equal(1, result.NewState.RoundNumber);
+    }
+
+    [Fact]
+    public void CompletedSequence_IncrementsVolleyCounter()
+    {
+        var state = TestGame.State(("a", 2, 0, 0), ("b", 2, 0, 0));
+        var result = DuelResolver.Resolve(state, Seqs(
+            ("a", [TestGame.Dodge, TestGame.Dodge, TestGame.Dodge]),
+            ("b", [TestGame.Dodge, TestGame.Dodge, TestGame.Dodge])));
+
+        Assert.Equal(1, result.NewState.DuelVolleysCompleted);
+    }
+
+    [Fact]
+    public void EarlyGameOver_StillCountsTheVolley()
+    {
+        var state = TestGame.State(("a", 2, 2, 0), ("b", 1, 0, 0));
+        var result = DuelResolver.Resolve(state, Seqs(
+            ("a", [TestGame.Attack("b"), TestGame.Dodge, TestGame.Dodge]),
+            ("b", [TestGame.Load, TestGame.Load, TestGame.Dodge])));
+
+        Assert.True(result.IsGameOver);
+        Assert.Equal(1, result.NewState.DuelVolleysCompleted);
     }
 
     [Fact]

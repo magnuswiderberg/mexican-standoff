@@ -4,12 +4,11 @@ public static class WinEvaluator
 {
     /// <summary>
     /// Checks win conditions after a round has resolved. Returns the winner ids
-    /// (several on a shared victory) or null when the game continues.
+    /// (several on a shared victory, empty on mutual destruction — the game is
+    /// over but nobody won) or null when the game continues.
     /// Ties break by gold, then HP, then bullets; still tied → shared win.
     /// </summary>
-    public static (IReadOnlyList<string>? Winners, WinReason? Reason) Evaluate(
-        GameState state,
-        IReadOnlyCollection<string> eliminatedThisRound)
+    public static (IReadOnlyList<string>? Winners, WinReason? Reason) Evaluate(GameState state)
     {
         var alive = state.AlivePlayers.ToList();
 
@@ -21,10 +20,7 @@ public static class WinEvaluator
             return ([alive[0].Id], WinReason.LastStanding);
 
         if (alive.Count == 0)
-        {
-            var lastRoundVictims = state.Players.Where(p => eliminatedThisRound.Contains(p.Id)).ToList();
-            return (TieBreak(lastRoundVictims), WinReason.MutualDestruction);
-        }
+            return ([], WinReason.MutualDestruction);
 
         return (null, null);
     }

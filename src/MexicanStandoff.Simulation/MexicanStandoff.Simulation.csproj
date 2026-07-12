@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MexicanStandoff.Engine\MexicanStandoff.Engine.csproj" />
+    <ProjectReference Include="..\MexicanStandoff.Bots\MexicanStandoff.Bots.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

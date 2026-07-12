@@ -1,6 +1,6 @@
 using MexicanStandoff.Engine;
 
-namespace MexicanStandoff.Simulation.Bots;
+namespace MexicanStandoff.Bots;
 
 /// <summary>Uniformly random among legal actions. The balance baseline.</summary>
 public sealed class RandomBot : IBot

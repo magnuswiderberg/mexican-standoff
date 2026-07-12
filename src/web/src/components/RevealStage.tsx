@@ -5,20 +5,24 @@ import type { SfxName } from '../sound'
 import { applyStep, initialDisplayState, stepDuration } from '../reveal'
 import { accentOf } from '../avatars'
 import { PlayerBoard } from './PlayerBoard'
-import type { ShotFx } from './PlayerBoard'
+import type { ShotFx, StageFx } from './PlayerBoard'
 import { Confetti } from './Confetti'
 
-/** Big center-stage emoji for the dramatic beats; null for quiet steps. */
-function stageIcon(step: RevealStepDto): string | null {
+/**
+ * Big stage emoji for the dramatic beats; null for quiet steps. Single-actor
+ * beats (a chest grab) anchor to that player's tile; multi-actor beats
+ * (standoff, elimination + skull-on-tile, victory) stay center stage.
+ */
+function stageFx(step: RevealStepDto, key: number): StageFx | null {
   switch (step.type) {
     case 'chestResolved':
-      if (step.chestWinnerId) return '💰'
-      if ((step.contenderIds?.length ?? 0) > 1) return '⚔️'
+      if (step.chestWinnerId) return { icon: '💰', playerId: step.chestWinnerId, key }
+      if ((step.contenderIds?.length ?? 0) > 1) return { icon: '⚔️', playerId: null, key }
       return null
     case 'playerEliminated':
-      return '☠️'
+      return { icon: '☠️', playerId: null, key }
     case 'gameEnded':
-      return '🏆'
+      return { icon: (step.winnerIds?.length ?? 0) > 0 ? '🏆' : '💀', playerId: null, key }
     default:
       return null
   }
@@ -54,7 +58,8 @@ function stepSounds(step: RevealStepDto): [SfxName, number][] {
           ]
         : [['eliminated', 0]]
     case 'gameEnded':
-      return [['fanfare', 0]]
+      // Mutual destruction ends with no winner: a somber beat, no fanfare.
+      return (step.winnerIds?.length ?? 0) > 0 ? [['fanfare', 0]] : [['eliminated', 0]]
     default:
       return []
   }
@@ -126,7 +131,7 @@ export function RevealStage({
     current?.type === 'shotFired' && current.shooterId && current.targetId
       ? { shooterId: current.shooterId, targetId: current.targetId, hit: current.hit ?? false, key: stepIndex }
       : null
-  const icon = current ? stageIcon(current) : null
+  const stage = current ? stageFx(current, stepIndex) : null
 
   return (
     <div className="reveal-stage">
@@ -153,20 +158,20 @@ export function RevealStage({
           maxHp={startingHp}
           maxBullets={job.prev.maxBullets}
           goldToWin={job.prev.goldToWin}
+          chestCount={job.prev.chestCount}
           meId={meId}
           shot={shot}
+          stage={stage}
           animKey={stepIndex}
         />
-        {icon && (
-          <div className="stage-icon" key={`icon${stepIndex}`} aria-hidden>
-            {icon}
-          </div>
-        )}
       </div>
-      {display.winnerIds !== null && <Confetti />}
+      {display.winnerIds !== null && display.winnerIds.length > 0 && <Confetti />}
       <div className="reveal-progress">
         {job.steps.map((_, i) => (
-          <span key={i} className={i <= stepIndex ? 'dot dot-done' : 'dot'} />
+          <span
+            key={i}
+            className={i < stepIndex ? 'dot dot-done' : i === stepIndex ? 'dot dot-done dot-now' : 'dot'}
+          />
         ))}
       </div>
     </div>

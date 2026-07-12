@@ -13,6 +13,9 @@ public sealed record GameState
     /// <summary>Completed Final Duel sequences without an elimination or gold gained.</summary>
     public int DuelSequencesWithoutProgress { get; init; }
 
+    /// <summary>Completed Final Duel sequences ("volleys" to players), for display.</summary>
+    public int DuelVolleysCompleted { get; init; }
+
     /// <summary>Duel stalemate guard active: no chest, free bullet at each sequence start.</summary>
     public bool SuddenDeath { get; init; }
 

@@ -9,9 +9,14 @@ namespace MexicanStandoff.Engine;
 /// </summary>
 public static class DuelResolver
 {
+    /// <param name="resignedIds">
+    /// Duelists who resigned: they dodge the first volley step and are then
+    /// eliminated, handing the opponent a last-standing win (see RoundResolver).
+    /// </param>
     public static RoundResult Resolve(
         GameState state,
-        IReadOnlyDictionary<string, IReadOnlyList<PlayerAction>> sequences)
+        IReadOnlyDictionary<string, IReadOnlyList<PlayerAction>> sequences,
+        IReadOnlyCollection<string>? resignedIds = null)
     {
         if (!state.IsDuel)
             throw new InvalidOperationException(
@@ -68,7 +73,7 @@ public static class DuelResolver
                 stepActions[id] = planned;
             }
 
-            var result = RoundResolver.Resolve(current, stepActions);
+            var result = RoundResolver.Resolve(current, stepActions, resignedIds);
             reveal.AddRange(result.Reveal);
             current = result.NewState;
 
@@ -76,7 +81,7 @@ public static class DuelResolver
             {
                 return new RoundResult
                 {
-                    NewState = current,
+                    NewState = current with { DuelVolleysCompleted = current.DuelVolleysCompleted + 1 },
                     Reveal = reveal,
                     WinnerIds = result.WinnerIds,
                     WinReason = result.WinReason,
@@ -91,6 +96,7 @@ public static class DuelResolver
         current = current with
         {
             DuelSequencesWithoutProgress = stalemates,
+            DuelVolleysCompleted = current.DuelVolleysCompleted + 1,
             SuddenDeath = current.SuddenDeath || stalemates >= current.Parameters.DuelStalemateSequences,
         };
 

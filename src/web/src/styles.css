@@ -1,7 +1,31 @@
 /* Mexican Standoff — dark saloon theme, mobile-first, .tv scales up for the monitor. */
 
+/* Rye (SIL OFL, self-hosted): wanted-poster woodtype for the logo. */
+@font-face {
+  font-family: 'Rye';
+  src: url('/fonts/Rye.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* Bitter (SIL OFL, self-hosted): slab-serif base font. Self-hosting also keeps
+   Android phones from substituting Noto for the Georgia fallback. */
+@font-face {
+  font-family: 'Bitter';
+  font-weight: 400;
+  src: url('/fonts/Bitter-400.woff2') format('woff2');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Bitter';
+  font-weight: 700;
+  src: url('/fonts/Bitter-700.woff2') format('woff2');
+  font-display: swap;
+}
+
 :root {
-  --bg: #171310;
+  /* --bg matches the edge color of splash.jpg so the artwork blends seamlessly. */
+  --bg: #070403;
   --bg-raised: #241d17;
   --bg-card: #2e251d;
   --line: #4a3b2c;
@@ -12,7 +36,7 @@
   --danger: #d4543c;
   --good: #7fb069;
   --dodge: #6fa8dc;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 * {
@@ -27,9 +51,9 @@ body,
 }
 
 body {
-  background: radial-gradient(circle at 50% -20%, #2b2118 0%, var(--bg) 60%);
+  background: radial-gradient(circle at 50% -20%, #1c1410 0%, var(--bg) 60%);
   color: var(--ink);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Bitter, Georgia, 'Times New Roman', serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -81,12 +105,28 @@ h2 {
   text-align: center;
 }
 
+/* align-items: center gives children fit-content width, which collapses the
+   auto-fit board grid to one column (win screen) — keep it full width. */
+.page.center .board {
+  width: 100%;
+}
+
 /* ---- TV / monitor scaling -------------------------------------------- */
 
+/* Read from across the room: fill the screen and center vertically instead
+   of huddling in the upper third. */
 .page.tv {
   max-width: 72rem;
   font-size: 1.35rem;
-  padding-top: 2rem;
+  gap: 1.3rem;
+  min-height: 100vh;
+  justify-content: center;
+  padding-top: 1.5rem;
+  padding-bottom: 2.5rem;
+}
+
+.page.tv .code-big {
+  font-size: 3.2rem;
 }
 
 .page.tv .board {
@@ -104,15 +144,42 @@ h2 {
 
 /* ---- shared bits ------------------------------------------------------ */
 
+/* Inline SVG icons (components/icons.tsx) size and color like the emoji
+   they replaced. */
+.icon {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+
 .logo {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
   letter-spacing: 0.02em;
+  font-family: Rye, Georgia, serif;
+  font-weight: normal; /* Rye has one weight; faux-bold smears the ornaments */
+  /* Rye runs wider than Georgia: shrink with the viewport so the wordmark
+     never wraps on phones. */
+  white-space: nowrap;
+  font-size: clamp(1.2rem, 6.5vw, 2em);
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.logo .emblem {
+  /* Sombrero stacked above the wordmark. */
+  height: 2.5em;
 }
 
 .tagline {
   text-align: center;
   color: var(--ink-dim);
   margin-top: 0;
+  text-wrap: balance;
 }
 
 .code {
@@ -148,6 +215,14 @@ h2 {
   font-size: 1.05rem;
 }
 
+/* Disabled gold must not look pressable: swap the saturated fill for a dull
+   mix instead of relying on the global opacity fade alone. */
+.primary:disabled {
+  background: color-mix(in srgb, var(--accent) 30%, var(--bg-card));
+  color: color-mix(in srgb, var(--ink) 55%, var(--bg-card));
+  opacity: 1;
+}
+
 .secondary {
   background: var(--bg-card);
   color: var(--ink);
@@ -164,6 +239,12 @@ h2 {
   margin-left: 0.5em;
   vertical-align: middle;
   font-weight: bold;
+}
+
+/* Dev bot seats: same shape as the you-badge, muted colors. */
+.bot-badge {
+  background: var(--line);
+  color: var(--ink-dim);
 }
 
 .countdown {
@@ -191,7 +272,29 @@ h2 {
 /* ---- home & lobby ------------------------------------------------------ */
 
 .home {
-  padding-top: 14vh;
+  justify-content: center;
+  min-height: 96vh;
+  padding-top: 0;
+  padding-bottom: 1rem;
+}
+
+.splash {
+  /* Bleed past the page padding so the artwork reaches the viewport edges. */
+  margin: -1rem -1rem 2rem -1rem;
+}
+
+.splash img {
+  display: block;
+  width: min(100%, 30rem);
+  margin: 0 auto;
+  /* Soft fade at the rim: the artwork's edges are already ~var(--bg), the mask
+     just guarantees no visible seam on displays that crush or lift blacks. */
+  -webkit-mask-image: radial-gradient(ellipse closest-side, #000 72%, transparent 100%);
+  mask-image: radial-gradient(ellipse closest-side, #000 72%, transparent 100%);
+}
+
+.home .logo {
+  margin-top: -1.6rem; /* tuck the title into the splash's dark lower rim */
 }
 
 .join-form {
@@ -208,12 +311,60 @@ h2 {
 
 .join-form-page {
   flex-direction: column;
-  padding-top: 10vh;
+  justify-content: center;
+  /* Center in the viewport (minus the .page paddings); tall content just flows. */
+  min-height: calc(100vh - 5rem);
 }
 
 .or {
   text-align: center;
   color: var(--ink-dim);
+}
+
+/* Expandable per-game settings under the host button (home page). */
+.host-settings {
+  align-self: center;
+  width: 100%;
+  max-width: 20rem;
+}
+
+.host-settings summary {
+  cursor: pointer;
+  text-align: center;
+  color: var(--ink-dim);
+  font-size: 0.9rem;
+  list-style: none; /* the ⚙️ is the affordance; no marker triangle */
+}
+
+.host-settings summary::-webkit-details-marker {
+  display: none;
+}
+
+.host-settings[open] summary,
+.host-settings summary:hover {
+  color: var(--ink);
+}
+
+.setting-row {
+  margin-top: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.setting-row select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--bg-raised);
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  padding: 0.4rem 0.6rem;
+}
+
+.setting-row select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .lobby-list {
@@ -250,11 +401,10 @@ h2 {
   gap: 0.5rem;
 }
 
-.join-url {
-  color: #241a06;
-  font-family: 'Courier New', monospace;
-  font-size: 0.8em;
-  word-break: break-all;
+.qr-link {
+  display: block;
+  line-height: 0;
+  text-decoration: none;
 }
 
 .lobby-panel {
@@ -303,8 +453,8 @@ h2 {
 
 .avatar {
   flex-shrink: 0;
-  width: 1.6em;
-  height: 1.6em;
+  width: 2.5em;
+  height: 2.5em;
   border-radius: 50%;
   object-fit: cover;
   display: inline-block;
@@ -319,17 +469,17 @@ h2 {
   color: var(--ink-dim);
   font-weight: bold;
   font-size: 0.85em;
-  font-family: Georgia, serif;
+  font-family: inherit;
 }
 
 .avatar-big {
-  width: 2.4em;
-  height: 2.4em;
+  width: 3.2em;
+  height: 3.2em;
 }
 
 .avatar-hero {
-  width: 7rem;
-  height: 7rem;
+  width: 10rem;
+  height: 10rem;
   border-radius: 18px;
   animation: pop 0.7s;
 }
@@ -349,16 +499,24 @@ h2 {
 }
 
 .pips {
-  letter-spacing: 0.1em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.12em;
+}
+
+.pip {
+  display: inline-flex;
+  align-items: center;
 }
 
 .pip-empty {
-  opacity: 0.35;
+  opacity: 0.3;
+  filter: grayscale(0.9);
 }
 
-.gold-target {
-  color: var(--ink-dim);
-  font-size: 0.85em;
+/* Ammo pips: brass cartridges. */
+.pip-bullet {
+  color: #cfa14f;
 }
 
 .tile-action {
@@ -372,6 +530,50 @@ h2 {
   transform-origin: center bottom;
   animation: flip-in 0.5s both;
   animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+/* Head-to-head (two tiles on the board): the revealed action is the whole
+   story of the volley — a big player-colored card, not a footnote chip. */
+.board-two .tile-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 1.25em;
+  font-weight: bold;
+  padding: 0.5rem 0.6rem;
+  border: 2px solid color-mix(in srgb, var(--player-color) 55%, var(--line));
+  color: var(--player-color);
+}
+
+/* Selection pressure: who has locked in (✓) and who the table is waiting on. */
+.lock-badge {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.5rem;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85em;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+}
+
+.lock-badge .spinner {
+  width: 0.65em;
+  height: 0.65em;
+}
+
+.lock-badge-done {
+  background: var(--good);
+  border-color: var(--good);
+  color: #142a0e;
+  font-weight: bold;
+  animation: pop 0.35s;
 }
 
 .tile-out {
@@ -499,15 +701,25 @@ h2 {
 }
 
 .dot {
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 0.6rem;
+  height: 0.6rem;
   border-radius: 50%;
-  background: var(--line);
-  transition: background 0.3s;
+  background: var(--bg-card);
+  border: 1px solid var(--ink-dim);
+  transition:
+    background 0.3s,
+    transform 0.3s;
 }
 
 .dot-done {
   background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 5px rgba(224, 168, 60, 0.55);
+}
+
+/* The step being played right now. */
+.dot-now {
+  transform: scale(1.4);
 }
 
 /* ---- action picker ------------------------------------------------------ */
@@ -551,10 +763,18 @@ h2 {
   color: var(--ink-dim);
 }
 
+/* Picked = filled gold, same language as the primary button — a tint alone
+   is impossible to spot on the small duel-planner row buttons. */
 .card-picked {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, var(--bg-card));
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: bold;
   transform: translateY(-3px);
+}
+
+.card-picked .card-why {
+  color: color-mix(in srgb, var(--accent-ink) 75%, var(--accent));
 }
 
 .targets {
@@ -579,7 +799,9 @@ h2 {
 
 .target-picked {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, var(--bg-raised));
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: bold;
 }
 
 .lock-in {
@@ -612,9 +834,26 @@ h2 {
 .duel-step-no {
   font-weight: bold;
   color: var(--accent);
-  width: 1.2rem;
-  text-align: center;
+  width: 1.9rem;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+}
+
+/* Projected bullets going into this move — explains why Attack is greyed out. */
+.duel-step-ammo {
+  display: flex;
+  align-items: center;
+  gap: 0.1em;
+  font-size: 0.62em;
+  font-weight: normal;
+  color: var(--ink-dim);
+}
+
+.duel-step-ammo .icon {
+  color: #cfa14f;
 }
 
 .duel-options {
@@ -631,6 +870,14 @@ h2 {
   border-radius: 9px;
   padding: 0.5rem 0.2rem;
   font-size: 0.85rem;
+}
+
+/* .duel-option is declared after .card-picked, so the picked gold fill needs
+   the compound selector to win the cascade. */
+.duel-option.card-picked {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
 }
 
 /* ---- banners ------------------------------------------------------------ */
@@ -660,10 +907,12 @@ h2 {
 
 /* ---- floating indicators (−1 HP, +gold) -------------------------------- */
 
+/* Starts over the tile's stat rows and rises within the tile, so a top-row
+   tile's indicator never drifts up into the round header. */
 .float {
   position: absolute;
-  top: -0.4rem;
-  right: 0.4rem;
+  top: 45%;
+  right: 0.5rem;
   font-weight: bold;
   font-size: 1.05em;
   pointer-events: none;
@@ -743,6 +992,24 @@ h2 {
   font-size: 7rem;
 }
 
+/* Single-actor beat (chest grab): the icon pops over the actor's own tile. */
+.tile-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  pointer-events: none;
+  z-index: 6;
+  animation: stage-pop 1.4s both;
+  filter: drop-shadow(0 4px 14px rgb(0 0 0 / 55%));
+}
+
+.page.tv .tile-stage {
+  font-size: 4.5rem;
+}
+
 /* ---- confetti ------------------------------------------------------------ */
 
 .confetti {
@@ -765,7 +1032,7 @@ h2 {
 
 .avatar-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.5rem;
 }
 
@@ -787,9 +1054,13 @@ h2 {
   object-fit: cover;
 }
 
+/* Selected portrait glows in the avatar's accent (set inline as --pick-glow)
+   and lifts above its neighbors — the thin border alone was easy to miss. */
 .avatar-pick-selected {
   border-color: var(--accent);
   transform: scale(1.08);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--pick-glow, var(--accent)) 65%, transparent);
+  z-index: 1;
 }
 
 .avatar-pick-taken img {
@@ -822,10 +1093,61 @@ h2 {
   animation: rise-in 0.3s;
 }
 
+.kick-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink-dim);
+  font-size: 0.8em;
+  padding: 0.25em 0.55em;
+  line-height: 1;
+}
+
+.kick-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Mid-game kick (forced resign) on a player tile — host phone and monitor. */
+.tile-kick {
+  position: absolute;
+  bottom: 0.4rem;
+  right: 0.5rem;
+  margin-left: 0;
+  background: var(--bg-raised);
+  font-size: 0.7em;
+}
+
+.tile-kick-armed {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--ink);
+  font-weight: bold;
+  animation: pop 0.25s;
+}
+
 /* ---- waiting states ------------------------------------------------------- */
 
 .center-text {
   text-align: center;
+}
+
+.spinner {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  vertical-align: -0.1em;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .ellipsis::after {
@@ -880,12 +1202,88 @@ h2 {
   justify-content: center;
 }
 
-.rematch-countdown {
+/* On phones the fixed toggle sits over the first content row — keep the
+   round header and reveal captions clear of it. */
+@media (max-width: 640px) {
+  .round-header {
+    padding-right: 2.8rem;
+  }
+
+  .caption {
+    padding: 0 2.8rem;
+  }
+}
+
+/* ---- resign & stop game --------------------------------------------------- */
+
+/* Armed state of a two-tap ConfirmButton: signal that the next tap is for real. */
+.confirm-armed {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.resign-btn {
+  margin-top: 0.8rem;
+  align-self: center;
+  font-size: 0.85em;
+  padding: 0.5rem 1rem;
+  color: var(--ink-dim);
+}
+
+/* Monitor kill switch: parked in a corner, away from the Start/rematch buttons. */
+.monitor-stop {
+  position: fixed;
+  bottom: 0.8rem;
+  right: 0.8rem;
+  z-index: 40;
+}
+
+.monitor-stop button {
+  font-size: 0.8em;
+  padding: 0.45rem 0.9rem;
+  opacity: 0.75;
+}
+
+.monitor-stop button:hover,
+.monitor-stop .confirm-armed {
+  opacity: 1;
+}
+
+/* Seat recovery QR, bottom-left corner during selection (mirrors .monitor-stop). */
+.monitor-rejoin {
+  position: fixed;
+  bottom: 0.8rem;
+  left: 0.8rem;
+  z-index: 40;
   display: flex;
-  gap: 0.8rem;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.65rem;
+  color: var(--ink-dim);
+  text-decoration: none;
+  opacity: 0.75;
+}
+
+.monitor-rejoin:hover {
+  opacity: 1;
+}
+
+.monitor-rejoin .rejoin-qr {
+  display: flex;
+  background: #f5ead6;
+  padding: 4px;
+  border-radius: 6px;
+  line-height: 0;
+}
+
+.resigned-badge {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
 }
 
 .winner-banner-tv {

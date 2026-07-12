@@ -1,8 +1,10 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { ActionDto } from '../types'
+import { chestName } from '../reveal'
 import type { DisplayPlayer } from '../reveal'
 import { accentOf, avatarOf, avatarUrl } from '../avatars'
+import { AttackIcon, BulletIcon, ChestIcon, DodgeIcon, LoadIcon } from './icons'
 
 export interface BoardPlayer {
   id: string
@@ -12,6 +14,8 @@ export interface BoardPlayer {
   bullets: number
   gold: number
   isAlive: boolean
+  /** Resigned players stay in the game but auto-Dodge every round. */
+  isResigned?: boolean
   revealedAction?: ActionDto | null
   flags?: DisplayPlayer['flags']
 }
@@ -24,16 +28,26 @@ export interface ShotFx {
   key: number
 }
 
-function actionLabel(action: ActionDto): string {
+/**
+ * Big dramatic-beat emoji for a reveal step. With a `playerId` it pops over
+ * that player's tile (the actor), otherwise center stage over the whole board.
+ */
+export interface StageFx {
+  icon: string
+  playerId: string | null
+  key: number
+}
+
+export function actionLabel(action: ActionDto, chestCount: number): ReactNode {
   switch (action.type) {
     case 'dodge':
-      return '💨 Dodge'
+      return <><DodgeIcon /> Dodge</>
     case 'load':
-      return '🔺 Load'
+      return <><LoadIcon /> Load</>
     case 'attack':
-      return '🔫 Attack'
+      return <><AttackIcon /> Attack</>
     case 'chest':
-      return `💰 Chest ${(action.chestIndex ?? 0) + 1}`
+      return <><ChestIcon /> {chestName(action.chestIndex, chestCount)}</>
   }
 }
 
@@ -55,15 +69,41 @@ export function Avatar({ avatar, name, size }: { avatar: string; name: string; s
   )
 }
 
-function Pips({ count, max, symbol, empty }: { count: number; max: number; symbol: string; empty: string }) {
+/** A row of filled/empty pips; `empty` defaults to a dimmed copy of `symbol`. */
+function Pips({ count, max, symbol, empty }: { count: number; max: number; symbol: ReactNode; empty?: ReactNode }) {
   return (
     <span className="pips">
       {Array.from({ length: max }, (_, i) => (
         <span key={i} className={i < count ? 'pip' : 'pip pip-empty'}>
-          {i < count ? symbol : empty}
+          {i < count ? symbol : (empty ?? symbol)}
         </span>
       ))}
     </span>
+  )
+}
+
+/** Two-tap kick on a player tile: ✕ arms, "kick?" fires. Disarms by itself. */
+function TileKick({ name, onKick }: { name: string; onKick: () => void }) {
+  const [armed, setArmed] = useState(false)
+
+  useEffect(() => {
+    if (!armed) return
+    const timer = setTimeout(() => setArmed(false), 4000)
+    return () => clearTimeout(timer)
+  }, [armed])
+
+  return (
+    <button
+      type="button"
+      className={`kick-btn tile-kick ${armed ? 'tile-kick-armed' : ''}`}
+      aria-label={armed ? `Confirm removing ${name}` : `Remove ${name}`}
+      onClick={() => {
+        if (armed) onKick()
+        else setArmed(true)
+      }}
+    >
+      {armed ? 'kick?' : '✕'}
+    </button>
   )
 }
 
@@ -86,18 +126,33 @@ export function PlayerBoard({
   maxHp,
   maxBullets,
   goldToWin,
+  chestCount = 1,
   meId,
   targetedIds,
+  lockedIds,
+  resignedIds,
+  onKick,
   shot,
+  stage,
   animKey = 0,
 }: {
   players: BoardPlayer[]
   maxHp: number
   maxBullets: number
   goldToWin: number
+  /** Chests in play — with a single chest, action chips say "Chest", not "Chest 1". */
+  chestCount?: number
   meId?: string | null
   targetedIds?: string[]
+  /** During selection: who has locked in. Non-null shows a ✓/spinner badge per living player. */
+  lockedIds?: string[] | null
+  /** Resigned/kicked mid-round — snapshots only catch up at resolution, this doesn't wait. */
+  resignedIds?: string[]
+  /** Host/monitor mid-game kick (forced resign) — a two-tap ✕ on living tiles (never on `meId`). */
+  onKick?: (playerId: string) => void
   shot?: ShotFx | null
+  /** Reveal-step stage icon — anchored to the actor's tile when it has a playerId. */
+  stage?: StageFx | null
   animKey?: number
 }) {
   const boardRef = useRef<HTMLDivElement>(null)
@@ -124,9 +179,11 @@ export function PlayerBoard({
   }, [shot])
 
   return (
-    <div className="board" ref={boardRef}>
+    // Two tiles = head-to-head: the revealed-action chips scale up (see .board-two).
+    <div className={players.length === 2 ? 'board board-two' : 'board'} ref={boardRef}>
       {players.map((p, i) => {
         const f = p.flags ?? {}
+        const resigned = p.isResigned || (resignedIds?.includes(p.id) ?? false)
         const classes = [
           'tile',
           !p.isAlive && 'tile-dead',
@@ -156,18 +213,36 @@ export function PlayerBoard({
               <Avatar avatar={p.avatar} name={p.name} />
               <span className="tile-name-text">{p.name}</span>
               {p.id === meId && <span className="you-badge">you</span>}
+              {resigned && p.isAlive && (
+                <span className="you-badge resigned-badge" title="Resigned — only dodging">
+                  🏳️
+                </span>
+              )}
             </div>
             <div className="tile-stats">
               <Pips count={p.hp} max={maxHp} symbol="❤️" empty="🖤" />
-              <Pips count={p.bullets} max={maxBullets} symbol="🔸" empty="▫️" />
-              <span className="gold">
-                {'🪙'.repeat(p.gold)}
-                <span className="gold-target">/{goldToWin}</span>
-              </span>
+              <Pips count={p.bullets} max={maxBullets} symbol={<BulletIcon className="pip-bullet" />} />
+              <Pips count={p.gold} max={Math.max(goldToWin, p.gold)} symbol="🪙" />
             </div>
-            {p.revealedAction && <div className="tile-action">{actionLabel(p.revealedAction)}</div>}
+            {p.revealedAction && <div className="tile-action">{actionLabel(p.revealedAction, chestCount)}</div>}
+            {lockedIds && p.isAlive && (
+              <div
+                className={`lock-badge ${lockedIds.includes(p.id) ? 'lock-badge-done' : ''}`}
+                title={lockedIds.includes(p.id) ? 'Locked in' : 'Still choosing'}
+              >
+                {lockedIds.includes(p.id) ? '✓' : <span className="spinner" />}
+              </div>
+            )}
+            {onKick && p.isAlive && !resigned && p.id !== meId && (
+              <TileKick name={p.name} onKick={() => onKick(p.id)} />
+            )}
             {!p.isAlive && <div className="tile-out">OUT</div>}
             {f.eliminated && <div className="tile-skull">☠️</div>}
+            {stage && stage.playerId === p.id && (
+              <div className="tile-stage" key={`stage${stage.key}`} aria-hidden>
+                {stage.icon}
+              </div>
+            )}
             {f.hit && (
               <span key={`hp${animKey}`} className="float float-hurt">
                 −1 ❤️
@@ -181,6 +256,11 @@ export function PlayerBoard({
           </div>
         )
       })}
+      {stage && !players.some((p) => p.id === stage.playerId) && (
+        <div className="stage-icon" key={`stage${stage.key}`} aria-hidden>
+          {stage.icon}
+        </div>
+      )}
       {shot && line && (
         <div className="shot-layer" key={shot.key}>
           <div className="muzzle-flash" style={{ left: line.x1, top: line.y1 }} />

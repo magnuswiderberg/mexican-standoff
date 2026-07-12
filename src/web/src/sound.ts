@@ -6,6 +6,8 @@
  */
 
 export type SfxName =
+  | 'join'
+  | 'leave'
   | 'flip'
   | 'shot'
   | 'whoosh'
@@ -100,6 +102,14 @@ export function playSfx(name: SfxName): void {
   if (!c) return
 
   switch (name) {
+    case 'join': // saloon doors swing in — two rising notes
+      tone(c, { freq: 587, dur: 0.1, type: 'triangle', vol: 0.22 })
+      tone(c, { at: 0.1, freq: 880, dur: 0.25, type: 'triangle', vol: 0.28 })
+      break
+    case 'leave': // …and swing out — falling pair, quieter
+      tone(c, { freq: 660, dur: 0.1, type: 'triangle', vol: 0.18 })
+      tone(c, { at: 0.1, freq: 440, dur: 0.25, type: 'triangle', vol: 0.2 })
+      break
     case 'flip': // card swish + snap
       noise(c, { dur: 0.12, filter: 'bandpass', freq: 500, freqEnd: 2400, vol: 0.25, q: 2 })
       tone(c, { at: 0.1, freq: 1800, dur: 0.03, type: 'square', vol: 0.08 })

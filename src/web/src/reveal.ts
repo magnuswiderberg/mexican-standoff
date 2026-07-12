@@ -16,6 +16,8 @@ export interface DisplayPlayer {
   bullets: number
   gold: number
   isAlive: boolean
+  /** Resigned players stay in the game but auto-Dodge every round. */
+  isResigned: boolean
   /** Card shown face-up for the current volley (null before the flip). */
   revealedAction: ActionDto | null
   /** Transient flags driving CSS animation on the currently played step. */
@@ -44,10 +46,13 @@ export interface DisplayState {
   caption: CaptionPart[]
   /** Set once a gameEnded step has played. */
   winnerIds: string[] | null
+  /** Chests in play — with a single chest, captions say "Chest", not "Chest 1". */
+  chestCount: number
 }
 
 export function initialDisplayState(prev: GameSnapshot): DisplayState {
   return {
+    chestCount: prev.chestCount,
     players: prev.players.map((p) => ({
       id: p.id,
       name: p.name,
@@ -56,6 +61,7 @@ export function initialDisplayState(prev: GameSnapshot): DisplayState {
       bullets: p.bullets,
       gold: p.gold,
       isAlive: p.isAlive,
+      isResigned: p.isResigned,
       revealedAction: null,
       flags: {},
     })),
@@ -79,18 +85,26 @@ export function stepDuration(step: RevealStepDto): number {
       return 1600
     case 'chestResolved':
       return 2000
+    // Kill/loot and endgame banners hold longer — they're the beats people
+    // react to, and the loot gold lands mid-step (sound at +700ms).
     case 'playerEliminated':
-      return 2400
+      return 3400
+    case 'playerResigned':
+      return 3000
     case 'actionFizzled':
       return 1600
     case 'gameEnded':
-      return 2800
+      return 3400
     default:
       return 1500
   }
 }
 
-function describeAction(action: ActionDto): string {
+export function chestName(index: number | null | undefined, chestCount: number): string {
+  return chestCount > 1 ? `Chest ${(index ?? 0) + 1}` : 'Chest'
+}
+
+function describeAction(action: ActionDto, chestCount: number): string {
   switch (action.type) {
     case 'dodge':
       return 'Dodge'
@@ -99,7 +113,7 @@ function describeAction(action: ActionDto): string {
     case 'attack':
       return 'Attack'
     case 'chest':
-      return `Chest ${(action.chestIndex ?? 0) + 1}`
+      return chestName(action.chestIndex, chestCount)
   }
 }
 
@@ -121,13 +135,25 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
   switch (step.type) {
     case 'actionsRevealed': {
       for (const p of players) p.revealedAction = null
-      for (const a of step.actions ?? []) {
+      const acts = step.actions ?? []
+      for (const a of acts) {
         const p = byId.get(a.playerId)
         if (!p) continue
         p.revealedAction = a.action
         if (a.action.type === 'dodge') p.flags.dodging = true
       }
-      caption = [t('Cards on the table!')]
+      // Head-to-head (duel volleys, 2-player games): name the picks outright —
+      // with only two cards on the table, the pair IS the story.
+      caption =
+        acts.length === 2
+          ? [
+              who(acts[0].playerId),
+              t(`: ${describeAction(acts[0].action, state.chestCount)}`),
+              t(' ⚔️ '),
+              who(acts[1].playerId),
+              t(`: ${describeAction(acts[1].action, state.chestCount)}`),
+            ]
+          : [t('Cards on the table!')]
       break
     }
     case 'shotFired': {
@@ -150,7 +176,7 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
     case 'actionCancelled': {
       const p = byId.get(step.playerId ?? '')
       if (p) p.flags.cancelled = true
-      caption = [who(step.playerId), t(` was hit — ${describeAction(step.action!)} is cancelled!`)]
+      caption = [who(step.playerId), t(` was hit — ${describeAction(step.action!, state.chestCount)} is cancelled!`)]
       break
     }
     case 'gunLoaded': {
@@ -172,16 +198,20 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
       break
     }
     case 'chestResolved': {
-      const chest = `Chest ${(step.chestIndex ?? 0) + 1}`
+      const chest = chestName(step.chestIndex, state.chestCount)
       const contenders = step.contenderIds ?? []
       if (step.chestWinnerId) {
+        const gained = step.goldGained ?? 1
         const p = byId.get(step.chestWinnerId)
         if (p) {
-          p.gold += 1
+          p.gold += gained
           p.flags.gotGold = true
-          p.flags.goldGained = 1
+          p.flags.goldGained = gained
         }
-        caption = [who(step.chestWinnerId), t(` grabs a gold bar from ${chest}!`)]
+        caption = [
+          who(step.chestWinnerId),
+          t(` grabs ${gained === 1 ? 'a gold bar' : `${gained} gold bars`} from ${chest}!`),
+        ]
       } else if (contenders.length > 1) {
         caption = [
           t(`${chest}: standoff between `),
@@ -210,16 +240,37 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
           looter.flags.goldGained = share
         }
       }
+      const bars = share === 1 ? '1 gold bar' : `${share} gold bars`
       caption =
         share > 0
-          ? [who(step.playerId), t(' is down! '), ...all(looters), t(` loot ${share} gold each.`)]
+          ? looters.length === 1
+            ? [who(step.playerId), t(' is down! '), ...all(looters), t(` loots ${bars}.`)]
+            : [who(step.playerId), t(' is down! '), ...all(looters), t(` loot ${bars} each.`)]
           : [who(step.playerId), t(' is down!')]
+      break
+    }
+    case 'playerResigned': {
+      const p = byId.get(step.playerId ?? '')
+      const lost = step.goldLost ?? 0
+      if (p) {
+        p.isAlive = false
+        p.hp = 0
+        p.gold = 0 // abandoned, nobody loots it
+        p.flags.eliminated = true
+      }
+      caption =
+        lost > 0
+          ? [
+              who(step.playerId),
+              t(` resigns — ${lost === 1 ? '1 gold bar' : `${lost} gold bars`} left on the table!`),
+            ]
+          : [who(step.playerId), t(' resigns and walks away. 🏳️')]
       break
     }
     case 'actionFizzled': {
       const p = byId.get(step.playerId ?? '')
       if (p) p.flags.cancelled = true
-      caption = [who(step.playerId), t(`'s ${describeAction(step.action!)} fizzles into a Dodge.`)]
+      caption = [who(step.playerId), t(`'s ${describeAction(step.action!, state.chestCount)} fizzles into a Dodge.`)]
       break
     }
     case 'gameEnded': {
@@ -233,11 +284,11 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
         step.winReason === 'LastStanding'
           ? [...names, t(winnerIds.length > 1 ? ' are the last standing!' : ' is the last one standing!')]
           : step.winReason === 'MutualDestruction'
-            ? [t('Mutual destruction — '), ...names, t(' share the victory!')]
+            ? [t('Mutual destruction — nobody wins!')]
             : [...names, t(winnerIds.length > 1 ? ' win with the gold!' : ' wins with the gold!')]
       break
     }
   }
 
-  return { players, caption, winnerIds }
+  return { players, caption, winnerIds, chestCount: state.chestCount }
 }

@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useGame } from '../useGame'
-import { useSound } from '../useSound'
+import { useLobbyChime, useSound } from '../useSound'
 import { ActionPicker } from '../components/ActionPicker'
 import { DuelPlanner } from '../components/DuelPlanner'
 import { Countdown } from '../components/Countdown'
-import { PlayerBoard, Avatar } from '../components/PlayerBoard'
+import { PlayerBoard, Avatar, actionLabel } from '../components/PlayerBoard'
 import { RevealStage } from '../components/RevealStage'
 import { SoundToggle } from '../components/SoundToggle'
 import { Confetti } from '../components/Confetti'
+import { ConfirmButton } from '../components/ConfirmButton'
 import { AVATARS, accentOf, avatarOf, avatarUrl } from '../avatars'
 import type { LobbyView } from '../types'
 import { navigate } from '../router'
@@ -68,7 +69,11 @@ function JoinForm({
             key={a.key}
             type="button"
             className={`avatar-pick ${selected === a.key ? 'avatar-pick-selected' : ''} ${taken.has(a.key) ? 'avatar-pick-taken' : ''}`}
-            style={selected === a.key ? { borderColor: a.accent } : undefined}
+            style={
+              selected === a.key
+                ? ({ borderColor: a.accent, '--pick-glow': a.accent } as React.CSSProperties)
+                : undefined
+            }
             disabled={taken.has(a.key)}
             aria-label={taken.has(a.key) ? `${a.persona} (taken)` : a.persona}
             onClick={() => setPicked(a.key)}
@@ -116,6 +121,7 @@ function LockProgress({ locked, total }: { locked: number; total: number }) {
 export function PlayerPage({ code }: { code: string }) {
   const game = useGame(code, 'player')
   const sound = useSound('player')
+  useLobbyChime(game.phase, game.lobby, sound.play)
   const { snapshot, playerId } = game
   const me = snapshot?.players.find((p) => p.id === playerId) ?? null
   const isHost = game.lobby !== null && game.lobby.players[0]?.id === playerId
@@ -149,7 +155,7 @@ export function PlayerPage({ code }: { code: string }) {
               Game <span className="code">{code}</span>
             </h2>
             <p className="hint">
-              Waiting for gunslingers<span className="ellipsis" /> ({game.lobby?.players.length ?? 0}/8)
+              Waiting for gunslingers <span className="spinner" /> ({game.lobby?.players.length ?? 0}/8)
             </p>
             <ul className="lobby-list">
               {game.lobby?.players.map((p) => (
@@ -157,6 +163,17 @@ export function PlayerPage({ code }: { code: string }) {
                   <Avatar avatar={p.avatar} name={p.name} />
                   <span>{p.name}</span>
                   {p.id === playerId && <span className="you-badge">you</span>}
+                  {p.isBot && <span className="you-badge bot-badge">bot</span>}
+                  {isHost && p.id !== playerId && (
+                    <button
+                      type="button"
+                      className="kick-btn"
+                      aria-label={`Remove ${p.name}`}
+                      onClick={() => game.kick(p.id)}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -168,19 +185,46 @@ export function PlayerPage({ code }: { code: string }) {
             ) : (
               <p className="hint">The host starts the game.</p>
             )}
+            {isHost && game.lobby?.botsEnabled && (game.lobby?.players.length ?? 0) < 8 && (
+              <button className="secondary" onClick={game.addBot}>
+                🤖 Add a bot
+              </button>
+            )}
+            <button className="secondary" onClick={game.leave}>
+              Leave game
+            </button>
           </div>
         )
 
       case 'selecting': {
         if (!snapshot || !me) return <div className="page center">Loading…</div>
         const alive = me.isAlive
+        const lockedIds = game.locked?.lockedPlayerIds ?? []
+        const resignedIds = game.locked?.resignedPlayerIds ?? []
+        // resignedIds covers being kicked mid-round — the snapshot only catches up at resolution.
+        const resigned = game.resigned || me.isResigned || resignedIds.includes(me.id)
+        // Echo the pick on the locked-in banner so nobody second-guesses mid-wait.
+        // A rehydrate loses the local echo — the banner falls back to bare "Locked in."
+        const submittedTarget =
+          game.submittedAction?.type === 'attack'
+            ? (snapshot.players.find((p) => p.id === game.submittedAction?.targetId) ?? null)
+            : null
+        const resignButton = alive && !resigned && (
+          <ConfirmButton
+            className="resign-btn"
+            label="🏳️ Resign"
+            confirmLabel="🏳️ Tap again to resign"
+            onConfirm={game.resign}
+          />
+        )
         return (
           <div className="page">
             <div className="round-header">
               <span>
-                {/* RoundNumber counts completed rounds; we're selecting the next one. */}
-                Round {snapshot.roundNumber + 1}
-                {snapshot.isDuel && ' ⚔️'}
+                {/* Both counters track completed rounds/volleys; we're selecting the next one. */}
+                {snapshot.isDuel
+                  ? `⚔️ ${snapshot.players.length === 2 ? 'Duel' : 'Final Duel'} — Volley ${snapshot.duelVolley + 1}`
+                  : `Round ${snapshot.roundNumber + 1}`}
               </span>
               <Countdown deadline={game.deadline} />
             </div>
@@ -194,6 +238,9 @@ export function PlayerPage({ code }: { code: string }) {
                   maxBullets={snapshot.maxBullets}
                   goldToWin={snapshot.goldToWin}
                   meId={playerId}
+                  lockedIds={lockedIds}
+                  resignedIds={resignedIds}
+                  onKick={isHost ? game.kick : undefined}
                 />
                 {game.locked ? (
                   <LockProgress locked={game.locked.lockedCount} total={game.locked.totalExpected} />
@@ -203,9 +250,52 @@ export function PlayerPage({ code }: { code: string }) {
                   </p>
                 )}
               </>
+            ) : resigned ? (
+              <>
+                <div className="waiting-banner">🏳️ You've resigned — you're out when this round ends.</div>
+                {game.locked && (
+                  <LockProgress locked={game.locked.lockedCount} total={game.locked.totalExpected} />
+                )}
+                <PlayerBoard
+                  players={snapshot.players}
+                  maxHp={snapshot.startingHp}
+                  maxBullets={snapshot.maxBullets}
+                  goldToWin={snapshot.goldToWin}
+                  meId={playerId}
+                  lockedIds={lockedIds}
+                  resignedIds={resignedIds}
+                  onKick={isHost ? game.kick : undefined}
+                />
+              </>
             ) : game.hasSubmitted ? (
               <>
-                <div className="waiting-banner">🔒 Locked in.</div>
+                <div className="waiting-banner">
+                  {game.submittedAction ? (
+                    <>
+                      🔒 Locked in: {actionLabel(game.submittedAction, snapshot.chestCount)}
+                      {submittedTarget && (
+                        <>
+                          {' → '}
+                          <span style={{ color: accentOf(submittedTarget.avatar) }}>
+                            {submittedTarget.name}
+                          </span>
+                        </>
+                      )}
+                    </>
+                  ) : game.submittedSequence ? (
+                    <>
+                      🔒 Locked in:{' '}
+                      {game.submittedSequence.map((a, i) => (
+                        <span key={i}>
+                          {i > 0 && ' → '}
+                          {actionLabel(a, snapshot.chestCount)}
+                        </span>
+                      ))}
+                    </>
+                  ) : (
+                    '🔒 Locked in.'
+                  )}
+                </div>
                 {game.locked ? (
                   <LockProgress locked={game.locked.lockedCount} total={game.locked.totalExpected} />
                 ) : (
@@ -219,15 +309,33 @@ export function PlayerPage({ code }: { code: string }) {
                   maxBullets={snapshot.maxBullets}
                   goldToWin={snapshot.goldToWin}
                   meId={playerId}
+                  lockedIds={lockedIds}
+                  resignedIds={resignedIds}
+                  onKick={isHost ? game.kick : undefined}
                 />
+                {resignButton}
               </>
             ) : snapshot.isDuel ? (
-              <DuelPlanner
-                snapshot={snapshot}
-                playerId={playerId!}
-                error={game.actionError}
-                onSubmit={game.submitSequence}
-              />
+              <>
+                {/* "Own stats always visible" holds in the duel too — both duelists' tiles above the planner. */}
+                <PlayerBoard
+                  players={snapshot.players.filter((p) => p.isAlive)}
+                  maxHp={snapshot.startingHp}
+                  maxBullets={snapshot.maxBullets}
+                  goldToWin={snapshot.goldToWin}
+                  meId={playerId}
+                  lockedIds={lockedIds}
+                  resignedIds={resignedIds}
+                  onKick={isHost ? game.kick : undefined}
+                />
+                <DuelPlanner
+                  snapshot={snapshot}
+                  playerId={playerId!}
+                  error={game.actionError}
+                  onSubmit={game.submitSequence}
+                />
+                {resignButton}
+              </>
             ) : (
               <>
                 <PlayerBoard
@@ -236,6 +344,9 @@ export function PlayerPage({ code }: { code: string }) {
                   maxBullets={snapshot.maxBullets}
                   goldToWin={snapshot.goldToWin}
                   meId={playerId}
+                  lockedIds={lockedIds}
+                  resignedIds={resignedIds}
+                  onKick={isHost ? game.kick : undefined}
                 />
                 <ActionPicker
                   snapshot={snapshot}
@@ -243,6 +354,7 @@ export function PlayerPage({ code }: { code: string }) {
                   error={game.actionError}
                   onSubmit={game.submitAction}
                 />
+                {resignButton}
               </>
             )}
           </div>
@@ -263,25 +375,43 @@ export function PlayerPage({ code }: { code: string }) {
           </div>
         )
 
+      case 'stopped':
+        return (
+          <div className="page center">
+            <div className="waiting-banner">🛑 The game was stopped.</div>
+            <p className="hint">Thanks for playing — round up the gang for another one!</p>
+            <button className="primary" onClick={() => navigate('/')}>
+              Back to start
+            </button>
+          </div>
+        )
+
       case 'gameover': {
         const winners = game.winnerIds
           ?.map((id) => snapshot?.players.find((p) => p.id === id))
           .filter((p) => p !== undefined)
+        const nobodyWon = (game.winnerIds?.length ?? 0) === 0
         const iWon = playerId !== null && (game.winnerIds?.includes(playerId) ?? false)
         return (
           <div className="page center">
             {iWon && <Confetti />}
             <div className="winner-banner">
-              🏆{' '}
-              {iWon
-                ? 'You win!'
-                : winners?.map((p, i) => (
-                    <span key={p.id}>
-                      {i > 0 && ' & '}
-                      <span style={{ color: accentOf(p.avatar) }}>{p.name}</span>
-                    </span>
-                  ))}
-              {!iWon && ' wins!'}
+              {nobodyWon ? (
+                '💀 Mutual destruction — nobody wins!'
+              ) : (
+                <>
+                  🏆{' '}
+                  {iWon
+                    ? 'You win!'
+                    : winners?.map((p, i) => (
+                        <span key={p.id}>
+                          {i > 0 && ' & '}
+                          <span style={{ color: accentOf(p.avatar) }}>{p.name}</span>
+                        </span>
+                      ))}
+                  {!iWon && ' wins!'}
+                </>
+              )}
             </div>
             {snapshot && (
               <PlayerBoard
@@ -293,9 +423,13 @@ export function PlayerPage({ code }: { code: string }) {
               />
             )}
             {game.actionError && <div className="error">{game.actionError}</div>}
-            <button className="primary" onClick={game.rematch}>
-              🔁 Play again
-            </button>
+            {game.hasMonitor ? (
+              <p className="hint">📺 The next game starts from the monitor.</p>
+            ) : (
+              <button className="primary" onClick={game.rematch}>
+                🔁 Play again — back to lobby
+              </button>
+            )}
           </div>
         )
       }

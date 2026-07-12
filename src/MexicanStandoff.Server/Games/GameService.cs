@@ -1,3 +1,4 @@
+using MexicanStandoff.Bots;
 using MexicanStandoff.Engine;
 using MexicanStandoff.Server.Contracts;
 using MexicanStandoff.Server.Hubs;
@@ -19,7 +20,21 @@ public sealed class GameService(
 {
     private static readonly GameParameters Parameters = GameParameters.Default;
 
-    public string CreateGame() => store.Create().Code;
+    /// <summary>Strategies dealt round-robin to added bots (stateless, so instances are shared).</summary>
+    private static readonly IBot[] BotStrategies =
+        [new AdaptiveBot(), new AggressiveBot(), new ChestRusherBot(), new RandomBot(), new TurtleBot()];
+
+    /// <summary>Lobby names for added bots; falls back to "Bot N" when exhausted.</summary>
+    private static readonly string[] BotNames =
+        ["Bot Sancho", "Bot Rosita", "Bot Dolores", "Bot Paco", "Bot Lupe", "Bot Chuy", "Bot Ramona"];
+
+    public string CreateGame(CreateGameSettings? settings = null)
+    {
+        var session = store.Create();
+        var seconds = settings?.SelectionTimerSeconds ?? options.Value.SelectionTimerSeconds;
+        session.SelectionTimerSeconds = Math.Clamp(seconds, 0, 600);
+        return session.Code;
+    }
 
     public async Task<JoinResult> JoinAsync(string code, string name, string? preferredAvatar = null)
     {
@@ -27,6 +42,7 @@ public sealed class GameService(
         JoinResult result;
         lock (session.Lock)
         {
+            ThrowIfStopped(session);
             if (session.Phase != GamePhase.Lobby)
                 throw new HubException("The game has already started.");
             if (session.Players.Count >= Parameters.MaxPlayers)
@@ -40,7 +56,7 @@ public sealed class GameService(
 
             var player = new SessionPlayer
             {
-                Id = $"p{session.Players.Count + 1}",
+                Id = $"p{++session.SeatsIssued}",
                 Token = Guid.NewGuid().ToString("N"),
                 Name = name,
                 Avatar = Avatars.Assign(preferredAvatar, session.Players.Select(p => p.Avatar)),
@@ -53,6 +69,122 @@ public sealed class GameService(
         return result;
     }
 
+    /// <summary>A player gives up their seat while the game is still in the lobby.</summary>
+    public async Task LeaveAsync(string code, string token)
+    {
+        var session = Require(code);
+        LobbyView lobby;
+        lock (session.Lock)
+        {
+            ThrowIfStopped(session);
+            if (session.Phase != GamePhase.Lobby)
+                throw new HubException("The game has already started.");
+            var player = session.PlayerByToken(token) ?? throw new HubException("Unknown player token.");
+            session.Players.Remove(player);
+            lobby = LobbyOf(session);
+        }
+
+        await hub.Clients.Group(session.Code).LobbyUpdated(lobby);
+    }
+
+    /// <summary>
+    /// Dev-only (see <see cref="BotOptions"/>): adds a bot seat to the lobby.
+    /// Allowed for the host (first seat) or for the monitor (no token — the
+    /// monitor can already start the game without one).
+    /// </summary>
+    public async Task AddBotAsync(string code, string? hostToken)
+    {
+        var session = Require(code);
+        LobbyView lobby;
+        lock (session.Lock)
+        {
+            ThrowIfStopped(session);
+            if (!options.Value.Bots.Enabled)
+                throw new HubException("Bots are not enabled on this server.");
+            if (session.Phase != GamePhase.Lobby)
+                throw new HubException("The game has already started.");
+            if (hostToken is not null)
+            {
+                var host = session.PlayerByToken(hostToken) ?? throw new HubException("Unknown player token.");
+                if (session.Players.Count == 0 || session.Players[0] != host)
+                    throw new HubException("Only the host can add bots.");
+            }
+            if (session.Players.Count >= Parameters.MaxPlayers)
+                throw new HubException("The game is full.");
+
+            var taken = session.Players.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var botCount = session.Players.Count(p => p.IsBot);
+            var bot = new SessionPlayer
+            {
+                Id = $"p{++session.SeatsIssued}",
+                Token = Guid.NewGuid().ToString("N"),
+                Name = BotNames.FirstOrDefault(n => !taken.Contains(n)) ?? $"Bot {session.SeatsIssued}",
+                Avatar = Avatars.Assign(null, session.Players.Select(p => p.Avatar)),
+                Brain = BotStrategies[botCount % BotStrategies.Length],
+            };
+            session.Players.Add(bot);
+            lobby = LobbyOf(session);
+        }
+
+        await hub.Clients.Group(session.Code).LobbyUpdated(lobby);
+    }
+
+    /// <summary>
+    /// Removes a player. Allowed for the host (first seat) or for the monitor
+    /// (no token — like <see cref="StartAsync"/> and <see cref="AddBotAsync"/>);
+    /// the monitor can kick anyone, including the host. In the lobby the seat is
+    /// freed; mid-game a kick is a forced resign (dodge out the current round,
+    /// then eliminated) — for players who lost their connection or walked away.
+    /// </summary>
+    public async Task KickAsync(string code, string? hostToken, string targetPlayerId, string connectionId)
+    {
+        var session = Require(code);
+        LobbyView? lobby = null;
+        PlayerLockedView? locked = null;
+        ResolveOutcome? outcome = null;
+        lock (session.Lock)
+        {
+            ThrowIfStopped(session);
+            if (session.Phase != GamePhase.Lobby && session.Phase != GamePhase.Selecting)
+                throw new HubException("Kicking is only possible in the lobby or during a round.");
+            if (hostToken is not null)
+            {
+                var host = session.PlayerByToken(hostToken) ?? throw new HubException("Unknown player token.");
+                if (session.Players.Count == 0 || session.Players[0] != host)
+                    throw new HubException("Only the host can kick players.");
+                if (host.Id == targetPlayerId)
+                    throw new HubException("The host cannot kick themselves — leave or resign instead.");
+            }
+            else if (!session.MonitorConnections.Contains(connectionId))
+            {
+                // The tokenless path is the monitor's alone — only a registered
+                // monitor connection may kick without a host token.
+                throw new HubException("Only the host or the monitor can kick players.");
+            }
+            var target = session.Players.FirstOrDefault(p => p.Id == targetPlayerId)
+                ?? throw new HubException("That player is not in the game.");
+
+            if (session.Phase == GamePhase.Lobby)
+            {
+                session.Players.Remove(target);
+                lobby = LobbyOf(session);
+            }
+            else
+            {
+                if (!session.State!.Player(target.Id).IsAlive)
+                    throw new HubException("That player is already out.");
+                if (!target.Resigned)
+                    (locked, outcome) = ResignLocked(session, target);
+            }
+        }
+
+        if (lobby is not null)
+            await hub.Clients.Group(session.Code).LobbyUpdated(lobby);
+        if (locked is not null)
+            await hub.Clients.Group(session.Code).PlayerLocked(locked);
+        await BroadcastResolvedAsync(session, outcome);
+    }
+
     public async Task StartAsync(string code)
     {
         var session = Require(code);
@@ -60,11 +192,14 @@ public sealed class GameService(
         int nonce;
         lock (session.Lock)
         {
+            ThrowIfStopped(session);
             if (session.Phase != GamePhase.Lobby)
                 throw new HubException("The game has already started.");
             if (session.Players.Count < Parameters.MinPlayers)
                 throw new HubException($"At least {Parameters.MinPlayers} players are needed.");
 
+            foreach (var player in session.Players)
+                player.Resigned = false;
             session.State = GameState.New(Parameters, session.Players.Select(p => (p.Id, p.Name)).ToArray());
             session.WinnerIds = null;
             session.WinReason = null;
@@ -73,6 +208,7 @@ public sealed class GameService(
         }
 
         ScheduleTimeout(session, nonce);
+        ScheduleAutoActions(session, nonce);
         await hub.Clients.Group(session.Code).RoundStarted(view);
     }
 
@@ -91,7 +227,7 @@ public sealed class GameService(
                 throw new HubException($"Illegal action: {reason}.");
 
             session.PendingActions[player.Id] = action;
-            locked = new PlayerLockedView(player.Id, session.PendingActions.Count, state.AliveCount);
+            locked = LockedViewOf(session, state, player.Id);
             if (session.PendingActions.Count == state.AliveCount)
                 outcome = ResolveLocked(session);
         }
@@ -115,7 +251,7 @@ public sealed class GameService(
                 throw new HubException($"Illegal sequence: {reason}.");
 
             session.PendingSequences[player.Id] = sequence;
-            locked = new PlayerLockedView(player.Id, session.PendingSequences.Count, state.AliveCount);
+            locked = LockedViewOf(session, state, player.Id);
             if (session.PendingSequences.Count == state.AliveCount)
                 outcome = ResolveLocked(session);
         }
@@ -124,25 +260,148 @@ public sealed class GameService(
         await BroadcastResolvedAsync(session, outcome);
     }
 
-    public async Task RematchAsync(string code)
+    /// <summary>
+    /// The player gives up: their action this round becomes a Dodge (replacing
+    /// anything already locked in) and the engine eliminates them when the round
+    /// resolves — no looters, gold abandoned (docs/game-design.md, Resigning).
+    /// </summary>
+    public async Task ResignAsync(string code, string token)
     {
         var session = Require(code);
-        RoundStartedView view;
-        int nonce;
+        PlayerLockedView? locked = null;
+        ResolveOutcome? outcome = null;
         lock (session.Lock)
         {
-            if (session.Phase != GamePhase.GameOver)
-                throw new HubException("A rematch is only possible after the game has ended.");
+            ThrowIfStopped(session);
+            if (session.Phase != GamePhase.Selecting)
+                throw new HubException("Resigning is only possible during a round.");
+            var player = session.PlayerByToken(token) ?? throw new HubException("Unknown player token.");
+            if (!session.State!.Player(player.Id).IsAlive)
+                throw new HubException("Eliminated players cannot resign.");
+            if (player.Resigned)
+                return; // double-tap
 
-            session.State = GameState.New(Parameters, session.Players.Select(p => (p.Id, p.Name)).ToArray());
-            session.WinnerIds = null;
-            session.WinReason = null;
-            nonce = BeginSelectionLocked(session);
-            view = new RoundStartedView(SnapshotOf(session), session.Deadline);
+            (locked, outcome) = ResignLocked(session, player);
         }
 
-        ScheduleTimeout(session, nonce);
-        await hub.Clients.Group(session.Code).RoundStarted(view);
+        if (locked is not null)
+            await hub.Clients.Group(session.Code).PlayerLocked(locked);
+        await BroadcastResolvedAsync(session, outcome);
+    }
+
+    /// <summary>
+    /// Marks the player resigned and locks in their dodge-out, resolving the
+    /// round if they were the last one pending. Used by a player's own resign
+    /// and by a mid-game kick. Always returns a lock view — even when the player
+    /// had already locked in, everyone should see the 🏳️ immediately (a kicker
+    /// especially needs the feedback). Caller must hold the session lock.
+    /// </summary>
+    private static (PlayerLockedView? Locked, ResolveOutcome? Outcome) ResignLocked(GameSession session, SessionPlayer player)
+    {
+        var state = session.State!;
+
+        player.Resigned = true;
+        if (state.IsDuel)
+            session.PendingSequences[player.Id] = DodgeSequence(state);
+        else
+            session.PendingActions[player.Id] = PlayerAction.Dodge.Instance;
+
+        var locked = LockedViewOf(session, state, player.Id);
+        var submitted = state.IsDuel ? session.PendingSequences.Count : session.PendingActions.Count;
+        var outcome = submitted == state.AliveCount ? ResolveLocked(session) : null;
+        return (locked, outcome);
+    }
+
+    /// <summary>Current lock progress + resigned flags. Caller must hold the session lock.</summary>
+    private static PlayerLockedView LockedViewOf(GameSession session, GameState state, string playerId)
+    {
+        var lockedIds = state.IsDuel
+            ? session.PendingSequences.Keys.ToArray()
+            : session.PendingActions.Keys.ToArray();
+        return new PlayerLockedView(
+            playerId,
+            lockedIds.Length,
+            state.AliveCount,
+            lockedIds,
+            session.Players.Where(p => p.Resigned).Select(p => p.Id).ToArray());
+    }
+
+    /// <summary>
+    /// After a game ends, a rematch returns everyone to the lobby (seats and bots
+    /// intact) instead of force-starting a new game — humans get to leave (or be
+    /// kicked) before the host starts the next one. While a monitor is watching,
+    /// only the monitor can trigger it (phones hide the button, this backs that up).
+    /// </summary>
+    public async Task RematchAsync(string code, string connectionId)
+    {
+        var session = Require(code);
+        LobbyView lobby;
+        lock (session.Lock)
+        {
+            ThrowIfStopped(session);
+            if (session.Phase != GamePhase.GameOver)
+                throw new HubException("A rematch is only possible after the game has ended.");
+            if (session.MonitorConnections.Count > 0 && !session.MonitorConnections.Contains(connectionId))
+                throw new HubException("The next game starts from the monitor.");
+
+            session.Phase = GamePhase.Lobby;
+            session.State = null;
+            session.WinnerIds = null;
+            session.WinReason = null;
+            session.Deadline = null;
+            session.SelectionNonce++; // invalidate any running timer
+            lobby = LobbyOf(session);
+        }
+
+        await hub.Clients.Group(session.Code).ReturnedToLobby(lobby);
+    }
+
+    /// <summary>A monitor page subscribed; broadcast when the first one appears.</summary>
+    public async Task MonitorConnectedAsync(string code, string connectionId)
+    {
+        var session = Require(code);
+        bool appeared;
+        lock (session.Lock)
+        {
+            appeared = session.MonitorConnections.Count == 0;
+            session.MonitorConnections.Add(connectionId);
+        }
+
+        if (appeared)
+            await hub.Clients.Group(session.Code).MonitorPresence(true);
+    }
+
+    /// <summary>A monitor connection dropped; broadcast when the last one is gone.</summary>
+    public async Task MonitorDisconnectedAsync(string code, string connectionId)
+    {
+        var session = store.Get(code);
+        if (session is null)
+            return; // the game is already gone
+        bool vanished;
+        lock (session.Lock)
+        {
+            vanished = session.MonitorConnections.Remove(connectionId) && session.MonitorConnections.Count == 0;
+        }
+
+        if (vanished)
+            await hub.Clients.Group(session.Code).MonitorPresence(false);
+    }
+
+    /// <summary>Stops the game for everyone (monitor button). Terminal — the session is dead.</summary>
+    public async Task StopAsync(string code)
+    {
+        var session = Require(code);
+        lock (session.Lock)
+        {
+            if (session.Phase == GamePhase.Stopped)
+                return; // two stop clicks racing — the first one already ended it
+            session.Phase = GamePhase.Stopped;
+            session.State = null;
+            session.Deadline = null;
+            session.SelectionNonce++; // invalidate any running timer
+        }
+
+        await hub.Clients.Group(session.Code).GameStopped();
     }
 
     /// <summary>Current full state for the monitor page or a reconnecting player.</summary>
@@ -166,7 +425,8 @@ public sealed class GameService(
                 player?.Id,
                 hasSubmitted,
                 session.WinnerIds,
-                session.WinReason?.ToString());
+                session.WinReason?.ToString(),
+                session.MonitorConnections.Count > 0);
         }
     }
 
@@ -181,6 +441,13 @@ public sealed class GameService(
         return session;
     }
 
+    /// <summary>Stopped is terminal — mutating calls get a clear error instead of a phase mismatch.</summary>
+    private static void ThrowIfStopped(GameSession session)
+    {
+        if (session.Phase == GamePhase.Stopped)
+            throw new HubException("The game has been stopped.");
+    }
+
     private static (SessionPlayer Player, GameState State) RequireSelectingPlayer(GameSession session, string token)
     {
         if (session.Phase != GamePhase.Selecting)
@@ -189,29 +456,36 @@ public sealed class GameService(
         var state = session.State!;
         if (!state.Player(player.Id).IsAlive)
             throw new HubException("Eliminated players cannot act.");
+        if (player.Resigned)
+            throw new HubException("You have resigned.");
         return (player, state);
     }
 
+    /// <summary>The all-Dodge duel sequence played for resigned, timed-out, and absent players.</summary>
+    private static PlayerAction[] DodgeSequence(GameState state) =>
+        Enumerable.Repeat((PlayerAction)PlayerAction.Dodge.Instance, state.Parameters.DuelSequenceLength).ToArray();
+
     /// <summary>Starts a new selection phase. Caller must hold the session lock.</summary>
-    private int BeginSelectionLocked(GameSession session)
+    private static int BeginSelectionLocked(GameSession session)
     {
         session.Phase = GamePhase.Selecting;
         session.PendingActions.Clear();
         session.PendingSequences.Clear();
         session.SelectionNonce++;
-        session.Deadline = options.Value.SelectionTimerSeconds > 0
-            ? DateTimeOffset.UtcNow.AddSeconds(options.Value.SelectionTimerSeconds)
+        session.Deadline = session.SelectionTimerSeconds > 0
+            ? DateTimeOffset.UtcNow.AddSeconds(session.SelectionTimerSeconds)
             : null;
         return session.SelectionNonce;
     }
 
     /// <summary>Resolves the round/sequence. Caller must hold the session lock.</summary>
-    private ResolveOutcome ResolveLocked(GameSession session)
+    private static ResolveOutcome ResolveLocked(GameSession session)
     {
         var state = session.State!;
+        var resigned = session.Players.Where(p => p.Resigned).Select(p => p.Id).ToHashSet();
         var result = state.IsDuel
-            ? DuelResolver.Resolve(state, session.PendingSequences)
-            : RoundResolver.Resolve(state, session.PendingActions);
+            ? DuelResolver.Resolve(state, session.PendingSequences, resigned)
+            : RoundResolver.Resolve(state, session.PendingActions, resigned);
         session.State = result.NewState;
 
         int? nextNonce = null;
@@ -242,20 +516,23 @@ public sealed class GameService(
         if (outcome is null)
             return;
         if (outcome.NextNonce is { } nonce)
+        {
             ScheduleTimeout(session, nonce);
+            ScheduleAutoActions(session, nonce);
+        }
         await hub.Clients.Group(session.Code).RoundResolved(outcome.View);
     }
 
     private void ScheduleTimeout(GameSession session, int nonce)
     {
-        if (options.Value.SelectionTimerSeconds <= 0)
+        if (session.SelectionTimerSeconds <= 0)
             return;
 
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(options.Value.SelectionTimerSeconds));
+                await Task.Delay(TimeSpan.FromSeconds(session.SelectionTimerSeconds));
                 await HandleTimeoutAsync(session, nonce);
             }
             catch (Exception ex)
@@ -280,9 +557,7 @@ public sealed class GameService(
                 if (state.IsDuel)
                 {
                     if (!session.PendingSequences.ContainsKey(player.Id))
-                        session.PendingSequences[player.Id] = Enumerable
-                            .Repeat((PlayerAction)PlayerAction.Dodge.Instance, state.Parameters.DuelSequenceLength)
-                            .ToArray();
+                        session.PendingSequences[player.Id] = DodgeSequence(state);
                 }
                 else if (!session.PendingActions.ContainsKey(player.Id))
                 {
@@ -296,20 +571,83 @@ public sealed class GameService(
         await BroadcastResolvedAsync(session, outcome);
     }
 
-    private static LobbyView LobbyOf(GameSession session) => new(
+    /// <summary>Bots pick their actions shortly after a selection phase begins.</summary>
+    private void ScheduleAutoActions(GameSession session, int nonce)
+    {
+        if (!options.Value.Bots.Enabled)
+            return;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (options.Value.Bots.ThinkMilliseconds > 0)
+                    await Task.Delay(options.Value.Bots.ThinkMilliseconds);
+                await SubmitBotActionsAsync(session, nonce);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Bot action submission failed for game {Code}", session.Code);
+            }
+        });
+    }
+
+    private async Task SubmitBotActionsAsync(GameSession session, int nonce)
+    {
+        var lockedViews = new List<PlayerLockedView>();
+        ResolveOutcome? outcome = null;
+        lock (session.Lock)
+        {
+            if (session.Phase != GamePhase.Selecting || session.SelectionNonce != nonce)
+                return; // the round resolved (or the game moved on) before the bots acted
+
+            var state = session.State!;
+            foreach (var bot in session.Players.Where(p => p.Brain is not null))
+            {
+                if (!state.Player(bot.Id).IsAlive)
+                    continue;
+                if (state.IsDuel)
+                {
+                    if (!session.PendingSequences.ContainsKey(bot.Id))
+                    {
+                        session.PendingSequences[bot.Id] = BotPlay.BuildDuelSequence(state, bot.Id, bot.Brain!, session.BotRng);
+                        lockedViews.Add(LockedViewOf(session, state, bot.Id));
+                    }
+                }
+                else if (!session.PendingActions.ContainsKey(bot.Id))
+                {
+                    session.PendingActions[bot.Id] = BotPlay.ChooseSafe(state, bot.Id, bot.Brain!, session.BotRng);
+                    lockedViews.Add(LockedViewOf(session, state, bot.Id));
+                }
+            }
+
+            var submitted = state.IsDuel ? session.PendingSequences.Count : session.PendingActions.Count;
+            if (submitted == state.AliveCount)
+                outcome = ResolveLocked(session);
+        }
+
+        foreach (var view in lockedViews)
+            await hub.Clients.Group(session.Code).PlayerLocked(view);
+        await BroadcastResolvedAsync(session, outcome);
+    }
+
+    private LobbyView LobbyOf(GameSession session) => new(
         session.Code,
-        session.Players.Select(p => new LobbyPlayer(p.Id, p.Name, p.Avatar)).ToList(),
-        session.Players.Count >= Parameters.MinPlayers && session.Phase == GamePhase.Lobby);
+        session.Players.Select(p => new LobbyPlayer(p.Id, p.Name, p.Avatar, p.IsBot)).ToList(),
+        session.Players.Count >= Parameters.MinPlayers && session.Phase == GamePhase.Lobby,
+        options.Value.Bots.Enabled);
 
     private static GameSnapshot SnapshotOf(GameSession session)
     {
         var state = session.State!;
         var avatars = session.Players.ToDictionary(p => p.Id, p => p.Avatar);
+        var resigned = session.Players.Where(p => p.Resigned).Select(p => p.Id).ToHashSet();
         return new GameSnapshot(
             session.Code,
             session.Phase.ToString(),
             state.RoundNumber,
             state.IsDuel,
+            state.DuelVolleysCompleted,
             state.SuddenDeath,
             state.ChestCount,
             state.Parameters.GoldToWin,
@@ -317,7 +655,9 @@ public sealed class GameService(
             state.Parameters.StartingHp,
             state.Parameters.DuelSequenceLength,
             state.Players
-                .Select(p => new PlayerSnapshot(p.Id, p.Name, avatars.GetValueOrDefault(p.Id, ""), p.Hp, p.Bullets, p.Gold, p.IsAlive))
+                .Select(p => new PlayerSnapshot(
+                    p.Id, p.Name, avatars.GetValueOrDefault(p.Id, ""), p.Hp, p.Bullets, p.Gold, p.IsAlive,
+                    resigned.Contains(p.Id)))
                 .ToList());
     }
 }

@@ -1,6 +1,6 @@
 using MexicanStandoff.Engine;
 
-namespace MexicanStandoff.Simulation.Bots;
+namespace MexicanStandoff.Bots;
 
 internal static class BotHelpers
 {

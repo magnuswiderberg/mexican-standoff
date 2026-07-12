@@ -1,6 +1,6 @@
 using MexicanStandoff.Engine;
 
-namespace MexicanStandoff.Simulation.Bots;
+namespace MexicanStandoff.Bots;
 
 /// <summary>Never touches a chest: loads, then shoots the biggest threat. Wins only by elimination.</summary>
 public sealed class AggressiveBot : IBot
