@@ -414,6 +414,83 @@ h2 {
   gap: 0.8rem;
 }
 
+/* ---- how to play --------------------------------------------------------- */
+
+/* Dim text link to the rules — on the home page and in the lobby. */
+.howto-link {
+  text-align: center;
+  color: var(--ink-dim);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.howto-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.howto {
+  padding-top: 1.5rem;
+  gap: 0;
+}
+
+.howto section {
+  margin-top: 1.4rem;
+}
+
+/* Wanted-poster section headers, matching the logo's woodtype. */
+.howto h2 {
+  font-family: Rye, Georgia, serif;
+  font-weight: normal;
+  font-size: 1.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.3rem;
+}
+
+.howto p {
+  margin: 0.5rem 0;
+  line-height: 1.55;
+}
+
+/* The four cards, shown as exhibits — same look as the picker, not pressable. */
+.howto-cards {
+  margin: 0.9rem 0;
+}
+
+.howto-cards .card {
+  min-height: 4.2rem;
+  justify-content: center;
+}
+
+.howto-actions,
+.howto-order,
+.howto-tips {
+  margin: 0.5rem 0;
+  padding-left: 1.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  line-height: 1.5;
+}
+
+.howto-action-name {
+  font-weight: bold;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.howto-order li::marker {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.howto .primary {
+  margin-top: 2rem;
+}
+
 /* ---- board ------------------------------------------------------------- */
 
 .board {

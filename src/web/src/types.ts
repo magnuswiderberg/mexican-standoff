@@ -37,6 +37,15 @@ export interface GameSnapshot {
   players: PlayerSnapshot[]
 }
 
+/** GET /api/rules — the engine's default rule numbers, for the "How to play" page. */
+export interface RulesView {
+  startingHp: number
+  maxBullets: number
+  goldToWin: number
+  goldPerChest: number
+  duelSequenceLength: number
+}
+
 /** Per-game settings sent with CreateGame; omitted fields fall back to server config. */
 export interface CreateGameSettings {
   /** Seconds to pick an action; 0 disables the timer. */

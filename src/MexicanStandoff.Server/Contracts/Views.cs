@@ -17,6 +17,13 @@ public sealed record GameSnapshot(
     int DuelSequenceLength,
     IReadOnlyList<PlayerSnapshot> Players);
 
+/// <summary>
+/// Default rule numbers for the standalone "How to play" page, served from
+/// <see cref="MexicanStandoff.Engine.GameParameters.Default"/> so the page
+/// never drifts from the engine.
+/// </summary>
+public sealed record RulesView(int StartingHp, int MaxBullets, int GoldToWin, int GoldPerChest, int DuelSequenceLength);
+
 public sealed record LobbyPlayer(string Id, string Name, string Avatar, bool IsBot = false);
 
 public sealed record LobbyView(

@@ -9,6 +9,7 @@ import { RevealStage } from '../components/RevealStage'
 import { SoundToggle } from '../components/SoundToggle'
 import { Confetti } from '../components/Confetti'
 import { ConfirmButton } from '../components/ConfirmButton'
+import { HowToPlayLink } from './HowToPlayPage'
 import { AVATARS, accentOf, avatarOf, avatarUrl } from '../avatars'
 import type { LobbyView } from '../types'
 import { navigate } from '../router'
@@ -193,6 +194,9 @@ export function PlayerPage({ code }: { code: string }) {
             <button className="secondary" onClick={game.leave}>
               Leave game
             </button>
+            {/* Same-tab is fine: coming back remounts the page and the stored
+                seat token rejoins this lobby. */}
+            <HowToPlayLink />
           </div>
         )
 

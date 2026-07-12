@@ -3,6 +3,7 @@ import { createConnection, friendlyError } from '../gameClient'
 import { navigate } from '../router'
 import { saveMonitorToken } from '../session'
 import { Logo } from '../components/Logo'
+import { HowToPlayLink } from './HowToPlayPage'
 import type { CreateGameResult, CreateGameSettings } from '../types'
 
 /** Selection timer choices; 0 means no timer (rounds wait for everyone). */
@@ -91,6 +92,8 @@ export function HomePage() {
       </details>
 
       {error && <div className="error">{error}</div>}
+
+      <HowToPlayLink />
     </div>
   )
 }
