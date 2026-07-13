@@ -15,6 +15,7 @@ great local dev experience, snappy realtime gameplay.
 | Unit tests | **xUnit** on the engine | Exhaustive rules coverage; the engine is pure so tests are fast and deterministic. |
 | Integration tests | **xUnit + WebApplicationFactory + SignalR client** | Drive full games through the real hub in-process. TestContainers joins the party when Cosmos is introduced (v2). |
 | Simulation | **Console app** referencing the engine | Bots with different strategies (shared `MexicanStandoff.Bots` library, also used for the server's dev lobby bots) play thousands of games across parameter grids; outputs game-length/win-rate stats. |
+| Installability | **Plain web page — no PWA** | The join flow is scan-a-QR-and-play; an install step is friction on the one thing that has to be frictionless, and offline (the feature that would justify a service worker) is impossible for a SignalR game. See [Why not a PWA](#why-not-a-pwa) below. |
 
 ## Architecture
 
@@ -57,6 +58,42 @@ great local dev experience, snappy realtime gameplay.
 - **Scale-out note**: in-memory state pins a game to one instance. Fine for a
   hobby project on a single-instance plan. If scale-out is ever needed:
   Azure SignalR Service + moving state to Cosmos/Redis.
+
+## Why not a PWA
+
+Considered and rejected (2026-07). The three things a PWA buys you all fail on
+this game:
+
+- **Offline play** — the feature that justifies a service worker — is
+  structurally impossible. Every round goes through the hub; a cached shell with
+  no connection is a dead screen.
+- **The install prompt fights the join flow.** A guest scans a QR at a party,
+  plays for ten minutes and never comes back. "Add to Home Screen" is friction
+  on the one step that has to have none, and it leaves an icon behind for a game
+  they played once.
+- **On iOS an install would actively break a seat.** A standalone PWA gets its
+  own storage partition, separate from Safari's — a player who installs mid-game
+  lands in the app with no seat token (see `session.ts`) and no seat. And a
+  scanned QR always opens Safari, never the installed app, so the install can't
+  intercept the only entry point we have anyway.
+
+A service worker on its own (no install) is a net negative here: it can't help
+the *first* load, which is the only load most guests do, and a shell cached
+across a deploy means a phone running last week's `types.ts` against this week's
+hub. HTTP caching gets the same win with none of that risk.
+
+What we did instead, aimed at the same pains:
+
+- **Screen Wake Lock** (`useWakeLock.ts`, on the player and monitor pages). The
+  real mobile complaint: the phone dims and locks while the table argues, and
+  waking it back up costs you the round. Works in a plain browser tab.
+- **Cache-Control on the static assets** (`Program.cs`). Fingerprinted `/assets`
+  are immutable-for-a-year; unhashed portraits, fonts and art get a day, which
+  outlives any party; `index.html` always revalidates so the shell can never go
+  stale against the hub.
+
+If the game is ever wrapped for an app store (PWABuilder/TWA), a manifest is the
+first thing needed and this decision gets revisited.
 
 ## Repository layout
 

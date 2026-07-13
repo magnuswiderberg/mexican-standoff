@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGame } from '../useGame'
 import { useLobbyChime, useSound } from '../useSound'
+import { useWakeLock } from '../useWakeLock'
 import { ActionPicker } from '../components/ActionPicker'
 import { DuelPlanner } from '../components/DuelPlanner'
 import { Countdown } from '../components/Countdown'
@@ -123,6 +124,7 @@ export function PlayerPage({ code }: { code: string }) {
   const game = useGame(code, 'player')
   const sound = useSound('player')
   useLobbyChime(game.phase, game.lobby, sound.play)
+  useWakeLock()
   const { snapshot, playerId } = game
   const me = snapshot?.players.find((p) => p.id === playerId) ?? null
   const isHost = game.lobby !== null && game.lobby.players[0]?.id === playerId

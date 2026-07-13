@@ -1,6 +1,7 @@
 import QRCode from 'react-qr-code'
 import { useGame } from '../useGame'
 import { useLobbyChime, useSound } from '../useSound'
+import { useWakeLock } from '../useWakeLock'
 import { Countdown } from '../components/Countdown'
 import { PlayerBoard, Avatar } from '../components/PlayerBoard'
 import { RevealStage } from '../components/RevealStage'
@@ -20,6 +21,8 @@ export function MonitorPage({ code }: { code: string }) {
   const game = useGame(code, 'monitor')
   const sound = useSound('monitor')
   useLobbyChime(game.phase, game.lobby, sound.play)
+  // The big screen is usually a laptop, and a laptop dims mid-standoff too.
+  useWakeLock()
   const { snapshot } = game
 
   const joinUrl = `${location.origin}/game/${code}`
