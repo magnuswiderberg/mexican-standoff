@@ -8,18 +8,18 @@ import type { CreateGameResult, CreateGameSettings } from '../types'
 
 /** Selection timer choices; 0 means no timer (rounds wait for everyone). */
 const TIMER_CHOICES = [
+  { seconds: 0, label: 'No timer' },
   { seconds: 15, label: '15 seconds' },
   { seconds: 30, label: '30 seconds' },
   { seconds: 60, label: '1 minute' },
   { seconds: 120, label: '2 minutes' },
-  { seconds: 0, label: 'No timer' },
 ]
 
 export function HomePage() {
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
-  const [timerSeconds, setTimerSeconds] = useState(30)
+  const [timerSeconds, setTimerSeconds] = useState(0)
 
   const joinGame = (e: React.FormEvent) => {
     e.preventDefault()

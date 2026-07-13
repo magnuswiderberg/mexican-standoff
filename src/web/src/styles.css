@@ -495,22 +495,33 @@ h2 {
 
 .board {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  /* Phone/player client: always two columns — three squeezes the tiles until
+     names truncate. The TV board overrides this with an auto-fit grid. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.6rem;
 }
 
 .tile {
   --player-color: var(--ink-dim);
   position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
   background: var(--bg-card);
   border: 2px solid color-mix(in srgb, var(--player-color) 40%, var(--line));
   border-radius: 12px;
-  padding: 0.6rem 0.7rem;
   transition:
     transform 0.25s,
     border-color 0.25s,
     box-shadow 0.25s,
     opacity 0.4s;
+}
+
+/* Name/stats/action column beside the full-height portrait strip. */
+.tile-body {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.6rem 0.55rem 0;
 }
 
 .tile-name {
@@ -554,6 +565,16 @@ h2 {
   height: 3.2em;
 }
 
+/* Board tile: full-height portrait strip flush with the tile's left edge
+   (inner radius = tile radius 12px minus its 2px border). Width scales with
+   the tile but never crowds out the six-coin gold row. */
+.avatar-tile {
+  width: clamp(2.75rem, 28%, 5rem);
+  height: auto;
+  align-self: stretch;
+  border-radius: 10px 0 0 10px;
+}
+
 .avatar-hero {
   width: 10rem;
   height: 10rem;
@@ -578,7 +599,18 @@ h2 {
 .pips {
   display: inline-flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 0.12em;
+}
+
+/* Long rows (the six-coin gold track) overlap like a coin stack so they fit
+   beside the full-height tile portrait. */
+.pips-overlap {
+  gap: 0;
+}
+
+.pips-overlap .pip + .pip {
+  margin-left: -0.35em;
 }
 
 .pip {
@@ -607,6 +639,18 @@ h2 {
   transform-origin: center bottom;
   animation: flip-in 0.5s both;
   animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+/* Holds the chip's slot open during a reveal (before the flip, and on tiles
+   that never act) so the board doesn't resize under the animations. The
+   zero-width space gives it a line box — an empty div would collapse. */
+.tile-action-empty {
+  visibility: hidden;
+  animation: none;
+}
+
+.tile-action-empty::before {
+  content: '\200b';
 }
 
 /* Head-to-head (two tiles on the board): the revealed action is the whole
@@ -690,6 +734,19 @@ h2 {
 .tile-dodge {
   border-color: var(--dodge);
   box-shadow: 0 0 14px color-mix(in srgb, var(--dodge) 45%, transparent);
+  animation: dodge-duck 0.9s ease-in-out;
+}
+
+/* Dust kicked up where the dodger stood — keyed per reveal step (like the
+   floating indicators) so it re-fires when a dodge card then dodges a shot. */
+.dodge-fx {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  font-size: 1.6em;
+  pointer-events: none;
+  z-index: 4;
+  animation: dodge-puff 1.1s ease-out both;
 }
 
 .tile-shooting {
@@ -1444,6 +1501,37 @@ h2 {
   }
   100% {
     transform: translate(0, 0) rotate(0);
+  }
+}
+
+/* Duck sideways out of the line of fire, hang low a beat, spring back. */
+@keyframes dodge-duck {
+  0% {
+    transform: translate(0, 0) rotate(0);
+  }
+  25% {
+    transform: translate(-0.6rem, 0.35rem) rotate(-3.5deg);
+  }
+  60% {
+    transform: translate(-0.5rem, 0.3rem) rotate(-3deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0);
+  }
+}
+
+/* The dust puff drifts the other way and dissolves. */
+@keyframes dodge-puff {
+  0% {
+    transform: translate(0, -50%) scale(0.5);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(0.9rem, -50%) scale(1.5);
+    opacity: 0;
   }
 }
 

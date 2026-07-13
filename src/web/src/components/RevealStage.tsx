@@ -162,6 +162,7 @@ export function RevealStage({
           meId={meId}
           shot={shot}
           stage={stage}
+          reserveAction
           animKey={stepIndex}
         />
       </div>

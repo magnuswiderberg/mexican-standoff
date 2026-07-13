@@ -51,8 +51,8 @@ export function actionLabel(action: ActionDto, chestCount: number): ReactNode {
   }
 }
 
-export function Avatar({ avatar, name, size }: { avatar: string; name: string; size?: 'big' | 'hero' }) {
-  const cls = `avatar ${size === 'big' ? 'avatar-big' : size === 'hero' ? 'avatar-hero' : ''}`
+export function Avatar({ avatar, name, size }: { avatar: string; name: string; size?: 'big' | 'hero' | 'tile' }) {
+  const cls = `avatar ${size ? `avatar-${size}` : ''}`
   const spec = avatarOf(avatar)
   if (!spec) {
     // Unknown key (shouldn't happen): fall back to an initial disc.
@@ -64,15 +64,16 @@ export function Avatar({ avatar, name, size }: { avatar: string; name: string; s
       src={avatarUrl(avatar)}
       alt={spec.persona}
       title={`${spec.name} — ${spec.persona}`}
-      style={{ boxShadow: `0 0 0 2px ${spec.accent}` }}
+      // The tile portrait sits inside the player-colored tile border, so no ring.
+      style={size === 'tile' ? undefined : { boxShadow: `0 0 0 2px ${spec.accent}` }}
     />
   )
 }
 
 /** A row of filled/empty pips; `empty` defaults to a dimmed copy of `symbol`. */
-function Pips({ count, max, symbol, empty }: { count: number; max: number; symbol: ReactNode; empty?: ReactNode }) {
+function Pips({ count, max, symbol, empty, overlap }: { count: number; max: number; symbol: ReactNode; empty?: ReactNode; overlap?: boolean }) {
   return (
-    <span className="pips">
+    <span className={overlap ? 'pips pips-overlap' : 'pips'}>
       {Array.from({ length: max }, (_, i) => (
         <span key={i} className={i < count ? 'pip' : 'pip pip-empty'}>
           {i < count ? symbol : (empty ?? symbol)}
@@ -134,6 +135,7 @@ export function PlayerBoard({
   onKick,
   shot,
   stage,
+  reserveAction = false,
   animKey = 0,
 }: {
   players: BoardPlayer[]
@@ -153,6 +155,12 @@ export function PlayerBoard({
   shot?: ShotFx | null
   /** Reveal-step stage icon — anchored to the actor's tile when it has a playerId. */
   stage?: StageFx | null
+  /**
+   * Reveal playback: hold the action chip's space on every tile even before the
+   * cards flip (and on tiles that never act). Without it the tiles resize the
+   * moment chips appear or a new volley starts, and the board flickers.
+   */
+  reserveAction?: boolean
   animKey?: number
 }) {
   const boardRef = useRef<HTMLDivElement>(null)
@@ -209,22 +217,32 @@ export function PlayerBoard({
               else tileRefs.current.delete(p.id)
             }}
           >
-            <div className="tile-name">
-              <Avatar avatar={p.avatar} name={p.name} />
-              <span className="tile-name-text">{p.name}</span>
-              {p.id === meId && <span className="you-badge">you</span>}
-              {resigned && p.isAlive && (
-                <span className="you-badge resigned-badge" title="Resigned — only dodging">
-                  🏳️
-                </span>
+            <Avatar avatar={p.avatar} name={p.name} size="tile" />
+            <div className="tile-body">
+              <div className="tile-name">
+                <span className="tile-name-text">{p.name}</span>
+                {p.id === meId && <span className="you-badge">you</span>}
+                {resigned && p.isAlive && (
+                  <span className="you-badge resigned-badge" title="Resigned — only dodging">
+                    🏳️
+                  </span>
+                )}
+              </div>
+              <div className="tile-stats">
+                <Pips count={p.hp} max={maxHp} symbol="❤️" empty="🖤" />
+                <Pips count={p.bullets} max={maxBullets} symbol={<BulletIcon className="pip-bullet" />} />
+                <Pips count={p.gold} max={Math.max(goldToWin, p.gold)} symbol="🪙" overlap />
+              </div>
+              {/* Distinct keys: the placeholder and the real chip must be separate
+                  elements, or React reuses the node and the card flip never plays. */}
+              {p.revealedAction ? (
+                <div key="action" className="tile-action">
+                  {actionLabel(p.revealedAction, chestCount)}
+                </div>
+              ) : (
+                reserveAction && <div key="action-empty" className="tile-action tile-action-empty" aria-hidden />
               )}
             </div>
-            <div className="tile-stats">
-              <Pips count={p.hp} max={maxHp} symbol="❤️" empty="🖤" />
-              <Pips count={p.bullets} max={maxBullets} symbol={<BulletIcon className="pip-bullet" />} />
-              <Pips count={p.gold} max={Math.max(goldToWin, p.gold)} symbol="🪙" />
-            </div>
-            {p.revealedAction && <div className="tile-action">{actionLabel(p.revealedAction, chestCount)}</div>}
             {lockedIds && p.isAlive && (
               <div
                 className={`lock-badge ${lockedIds.includes(p.id) ? 'lock-badge-done' : ''}`}
@@ -242,6 +260,11 @@ export function PlayerBoard({
               <div className="tile-stage" key={`stage${stage.key}`} aria-hidden>
                 {stage.icon}
               </div>
+            )}
+            {f.dodging && (
+              <span key={`dg${animKey}`} className="dodge-fx" aria-hidden>
+                💨
+              </span>
             )}
             {f.hit && (
               <span key={`hp${animKey}`} className="float float-hurt">
