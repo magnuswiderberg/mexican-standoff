@@ -424,13 +424,17 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
         Assert.Equal(3, view.Lobby.Players.Count);
     }
 
-    /// <summary>Plays a 2-player game to a winner (Anna kills Bob over two duel volleys).</summary>
+    /// <summary>
+    /// Plays a 2-player game to a winner (Anna kills Bob over two duel volleys).
+    /// <paramref name="fromHostSeat"/> starts it on Anna's seat token instead of the
+    /// monitor token — the monitor-less "Host &amp; play" game.
+    /// </summary>
     private static async Task<(JoinResult Anna, JoinResult Bob)> PlayTwoPlayerGameToWinner(
-        GameClient client, string code)
+        GameClient client, string code, bool fromHostSeat = false)
     {
         var anna = await client.Join(code, "Anna");
         var bob = await client.Join(code, "Bob");
-        await client.Start(code);
+        await client.Start(code, fromHostSeat ? anna.PlayerToken : null);
         await client.NextRound();
 
         await client.SubmitSequence(code, anna.PlayerToken, Actions.Load, Actions.Load, Actions.Attack(bob.PlayerId));
@@ -441,6 +445,43 @@ public class GameHubTests : IClassFixture<StandoffServerFactory>
         var final = await client.NextResolved();
         Assert.NotNull(final.WinnerIds);
         return (anna, bob);
+    }
+
+    /// <summary>
+    /// The "Host &amp; play" flow (docs/host-without-monitor.md): the phone that created
+    /// the game takes the first seat instead of opening a monitor page, so the whole
+    /// game — start, rematch, start again — runs on the host's own seat token and no
+    /// monitor token is ever proved.
+    /// </summary>
+    [Fact]
+    public async Task HostAndPlay_RunsTheWholeGame_FromTheHostSeat_WithNoMonitor()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        var (anna, _) = await PlayTwoPlayerGameToWinner(client, code, fromHostSeat: true);
+        Assert.False((await client.Watch(code)).HasMonitor);
+
+        // No big screen to defer to: the rematch is the host's to call.
+        await client.Rematch(code, anna.PlayerToken);
+        var lobby = await client.NextReturnedToLobby();
+        Assert.True(lobby.CanStart);
+
+        await client.Start(code, anna.PlayerToken);
+        var round = await client.NextRound();
+        Assert.Equal(0, round.Snapshot.RoundNumber);
+    }
+
+    [Fact]
+    public async Task StartGame_FromANonHostSeat_IsRejected()
+    {
+        await using var client = await GameClient.ConnectAsync(_factory);
+        var code = await client.CreateGame();
+        await client.Join(code, "Anna"); // first seat = host
+        var bob = await client.Join(code, "Bob");
+
+        // Starting is not something any player may spring on the room.
+        var ex = await Assert.ThrowsAsync<HubException>(() => client.Start(code, bob.PlayerToken));
+        Assert.Contains("host", ex.Message);
     }
 
     [Fact]

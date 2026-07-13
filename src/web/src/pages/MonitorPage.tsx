@@ -42,6 +42,40 @@ export function MonitorPage({ code }: { code: string }) {
           </div>
         )
 
+      // Phone → TV handoff: this screen has no monitor token (the game was started
+      // on a phone, or this browser lost its storage), so it asks the host for one
+      // and shows a pair code they can match against the screen in front of them.
+      case 'pairing':
+        return (
+          <div className="page tv center">
+            <Logo />
+            {game.pairingError ? (
+              <>
+                {/* The host said no, or a game is running — either way, retriable. */}
+                <div className="waiting-banner">🚫 {game.pairingError}</div>
+                <button className="primary" onClick={game.requestMonitor}>
+                  Ask again
+                </button>
+              </>
+            ) : (
+              <>
+                <h2>Show the board on this screen</h2>
+                <p className="hint">
+                  On the host's phone, allow the screen showing this code — game{' '}
+                  <span className="code">{code}</span>
+                </p>
+                <div className="code code-big pair-code">{game.myRequest?.pairCode}</div>
+                <p className="hint">
+                  Waiting for the host <span className="spinner" />
+                </p>
+              </>
+            )}
+            <button className="secondary" onClick={() => navigate('/')}>
+              Back to start
+            </button>
+          </div>
+        )
+
       case 'joining': // monitor never joins; unreachable
       case 'lobby':
         return (
@@ -49,7 +83,16 @@ export function MonitorPage({ code }: { code: string }) {
             <Logo />
             <div className="monitor-lobby">
               <div className="qr-panel">
-                <a className="qr-link" href={joinUrl} aria-label="Join this game">
+                {/* A new tab, always: clicking the QR on the hosting screen used to
+                    navigate this tab into the game, silently taking the monitor
+                    down with it. */}
+                <a
+                  className="qr-link"
+                  href={joinUrl}
+                  target="_blank"
+                  rel="noopener"
+                  aria-label="Open the join page in a new tab"
+                >
                   <QRCode value={joinUrl} size={280} bgColor="#f5ead6" fgColor="#171310" />
                 </a>
                 <div className="code code-big">{code}</div>
@@ -200,7 +243,13 @@ export function MonitorPage({ code }: { code: string }) {
   // The kill switch lives on the monitor (like Start): visible whenever a
   // session is alive — including reveal playback, where a runaway game
   // (e.g. a duel against a permanent dodger) spends nearly all its time.
-  const canStop = game.phase !== 'connecting' && game.phase !== 'fatal' && game.phase !== 'stopped'
+  // A screen still waiting to be made the board has no control token — and no
+  // business ending the room's game.
+  const canStop =
+    game.phase !== 'connecting' &&
+    game.phase !== 'fatal' &&
+    game.phase !== 'stopped' &&
+    game.phase !== 'pairing'
 
   return (
     <>
@@ -210,7 +259,13 @@ export function MonitorPage({ code }: { code: string }) {
           rescanning — the seat token's localStorage backup rebinds the new tab
           (session.ts probes that the old tab is really gone first). */}
       {game.phase === 'selecting' && (
-        <a className="monitor-rejoin" href={joinUrl} aria-label="Rejoin this game">
+        <a
+          className="monitor-rejoin"
+          href={joinUrl}
+          target="_blank"
+          rel="noopener"
+          aria-label="Open the rejoin page in a new tab"
+        >
           <span className="rejoin-qr">
             <QRCode value={joinUrl} size={84} bgColor="#f5ead6" fgColor="#171310" />
           </span>

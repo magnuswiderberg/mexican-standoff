@@ -297,9 +297,25 @@ h2 {
   margin-top: -1.6rem; /* tuck the title into the splash's dark lower rim */
 }
 
+/* Code on top, its two uses (take a seat / be the board) side by side underneath. */
 .join-form {
   display: flex;
+  flex-direction: column;
   gap: 0.6rem;
+}
+
+.code-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+/* Two labels sharing a phone's width: trim the generous default button padding so
+   each stays on one line (they wrap, rather than overflow, on a tiny screen). */
+.code-actions button {
+  flex: 1;
+  min-width: 0;
+  padding-inline: 0.5rem;
+  font-size: 0.95rem;
 }
 
 .join-form input {
@@ -319,6 +335,114 @@ h2 {
 .or {
   text-align: center;
   color: var(--ink-dim);
+}
+
+/* The two ways to host: play on this phone, or hang the board on a big screen.
+   Each button carries a one-line hint — which one you want depends on the room,
+   not on the game. */
+.host-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.host-choices button + .host-hint {
+  margin-bottom: 0.6rem;
+}
+
+.host-hint {
+  text-align: center;
+  font-size: 0.85rem;
+  text-wrap: balance;
+}
+
+/* Phone → TV handoff. The host's prompt sits above the page content in every
+   phase — a TV can be wheeled in mid-game — so it is loud enough to notice and
+   not so tall that it buries the round. */
+.monitor-prompt {
+  background: var(--bg-raised);
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  text-wrap: balance;
+}
+
+.monitor-prompt p {
+  margin: 0;
+}
+
+.monitor-prompt-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.monitor-prompt-actions button {
+  flex: 1;
+}
+
+/* The waiting screen's own code, big enough to read from the sofa. */
+.page.tv .pair-code {
+  font-size: 4.5rem;
+}
+
+/* The phone lobby's QR: in a monitor-less game the host's screen is the way in. */
+.invite {
+  align-self: center;
+  width: 100%;
+  max-width: 20rem;
+}
+
+.invite summary {
+  cursor: pointer;
+  text-align: center;
+  color: var(--ink-dim);
+  font-size: 0.9rem;
+  list-style: none; /* the 📲 is the affordance; no marker triangle */
+}
+
+.invite summary::-webkit-details-marker {
+  display: none;
+}
+
+.invite[open] summary,
+.invite summary:hover {
+  color: var(--ink);
+}
+
+.invite-body {
+  margin-top: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+/* The TV route, hung below the player QR and visibly secondary to it — most games
+   never have a big screen, and the ones that do only set it up once. */
+.invite-board {
+  border-top: 1px solid var(--line);
+  padding-top: 0.7rem;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.invite-board .hint {
+  text-wrap: balance;
+}
+
+/* The QR is fixed-size (react-qr-code renders an SVG at `size` px); let it shrink
+   with the panel on narrow phones rather than pushing the page sideways. */
+.invite-body .qr-panel svg {
+  width: 100%;
+  height: auto;
+  max-width: 12.5rem;
 }
 
 /* Expandable per-game settings under the host button (home page). */
@@ -582,10 +706,13 @@ h2 {
   animation: pop 0.7s;
 }
 
+/* Also on the phone win screen now, where several winners would otherwise run
+   off the side of a narrow viewport. */
 .winner-portraits {
   display: flex;
   gap: 1rem;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .tile-stats {

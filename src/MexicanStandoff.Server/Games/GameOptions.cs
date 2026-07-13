@@ -8,6 +8,13 @@ public sealed class GameOptions
     /// <summary>Idle sessions older than this are pruned.</summary>
     public TimeSpan SessionLifetime { get; set; } = TimeSpan.FromHours(2);
 
+    /// <summary>
+    /// How long a screen waiting to become the board keeps its place in the queue.
+    /// Both the waiting screen and the host's prompt run this clock down, so it also
+    /// decides how long they stare at a request nobody answered.
+    /// </summary>
+    public TimeSpan MonitorRequestLifetime { get; set; } = TimeSpan.FromMinutes(2);
+
     public BotOptions Bots { get; set; } = new();
 }
 

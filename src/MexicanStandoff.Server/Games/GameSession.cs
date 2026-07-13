@@ -31,6 +31,14 @@ public sealed class SessionPlayer
 }
 
 /// <summary>
+/// A screen that has no monitor token asking to become this game's board — the
+/// phone → TV handoff. The pair code is shown on the asking screen so the host can
+/// see they are approving the TV in front of them and not someone else's browser;
+/// the connection id is where the monitor token goes if they say yes.
+/// </summary>
+public sealed record MonitorRequest(string PairCode, string ConnectionId, DateTimeOffset RequestedAt);
+
+/// <summary>
 /// Mutable per-game session. All mutation happens under <see cref="Lock"/>;
 /// SignalR broadcasts happen after the lock is released.
 /// </summary>
@@ -72,6 +80,13 @@ public sealed class GameSession
     /// is monitor-only. Only touched under <see cref="Lock"/>.
     /// </summary>
     public HashSet<string> MonitorConnections { get; } = [];
+
+    /// <summary>
+    /// The screen currently asking to become the board, if any. One at a time: a
+    /// second asker replaces the first, so nobody can stack prompts up on the host.
+    /// Only touched under <see cref="Lock"/>.
+    /// </summary>
+    public MonitorRequest? PendingMonitor { get; set; }
 
     /// <summary>RNG for bot decisions; only touched under <see cref="Lock"/>.</summary>
     public Random BotRng { get; } = new();

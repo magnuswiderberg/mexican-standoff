@@ -51,6 +51,22 @@ public sealed class GameHub(GameService games) : Hub<IGameClient>
         return games.GetView(code, token: null);
     }
 
+    /// <summary>
+    /// Phone → TV handoff: a screen with no monitor token asks the host to make it
+    /// the board. It joins the group so it hears the game while it waits (and so a
+    /// grant lands on a connection already subscribed).
+    /// </summary>
+    public async Task<MonitorRequestView> RequestMonitor(string gameCode)
+    {
+        var code = Normalize(gameCode);
+        await Groups.AddToGroupAsync(Context.ConnectionId, code);
+        return await games.RequestMonitorAsync(code, Context.ConnectionId);
+    }
+
+    /// <summary>The host (or a monitor already up) answers the waiting screen.</summary>
+    public Task DecideMonitor(string gameCode, string? controlToken, bool allow) =>
+        games.DecideMonitorAsync(Normalize(gameCode), controlToken, allow);
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         if (Context.Items.TryGetValue(MonitorCodeKey, out var code) && code is string monitorCode)

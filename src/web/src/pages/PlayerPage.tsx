@@ -10,6 +10,7 @@ import { RevealStage } from '../components/RevealStage'
 import { SoundToggle } from '../components/SoundToggle'
 import { Confetti } from '../components/Confetti'
 import { ConfirmButton } from '../components/ConfirmButton'
+import { InvitePanel } from '../components/InvitePanel'
 import { HowToPlayLink } from './HowToPlayPage'
 import { AVATARS, accentOf, avatarOf, avatarUrl } from '../avatars'
 import type { LobbyView } from '../types'
@@ -109,6 +110,35 @@ function JoinForm({
   )
 }
 
+/**
+ * A screen is asking to become the board (phone → TV handoff). Only the host sees
+ * this, and only their tap hands the monitor token over — the pair code is on the
+ * asking screen, so they can check they are approving the TV they are looking at.
+ */
+function MonitorPrompt({
+  pairCode,
+  onDecide,
+}: {
+  pairCode: string
+  onDecide: (allow: boolean) => void
+}) {
+  return (
+    <div className="monitor-prompt">
+      <p>
+        📺 A screen wants to show the board. Does it say <span className="code">{pairCode}</span>?
+      </p>
+      <div className="monitor-prompt-actions">
+        <button className="primary" onClick={() => onDecide(true)}>
+          Yes — put it up
+        </button>
+        <button className="secondary" onClick={() => onDecide(false)}>
+          No
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function LockProgress({ locked, total }: { locked: number; total: number }) {
   return (
     <div className="lock-progress">
@@ -160,6 +190,13 @@ export function PlayerPage({ code }: { code: string }) {
             <p className="hint">
               Waiting for gunslingers <span className="spinner" /> ({game.lobby?.players.length ?? 0}/8)
             </p>
+            {/* With no monitor, this phone is the only place the QR can live —
+                so open it on the empty lobby the host lands on. A monitor game
+                already has the code up on the wall; keep it folded away there. */}
+            <InvitePanel
+              code={code}
+              alone={!game.hasMonitor && (game.lobby?.players.length ?? 0) <= 1}
+            />
             <ul className="lobby-list">
               {game.lobby?.players.map((p) => (
                 <li key={p.id} className="lobby-player">
@@ -401,6 +438,15 @@ export function PlayerPage({ code }: { code: string }) {
         return (
           <div className="page center">
             {iWon && <Confetti />}
+            {/* Same hero portrait the monitor throws up — the phones are the
+                monitor, and a win deserves a face on every screen. */}
+            {!nobodyWon && (
+              <div className="winner-portraits">
+                {winners?.map((p) => (
+                  <Avatar key={p.id} avatar={p.avatar} name={p.name} size="hero" />
+                ))}
+              </div>
+            )}
             <div className="winner-banner">
               {nobodyWon ? (
                 '💀 Mutual destruction — nobody wins!'
@@ -444,9 +490,17 @@ export function PlayerPage({ code }: { code: string }) {
     }
   }
 
+  // Between games only — the server refuses mid-round requests, and a prompt landing
+  // on top of the action picker is a mis-tap waiting to happen. A TV that turns up
+  // mid-game waits for this one to finish; that is what Stop and the rematch are for.
+  const canDecideMonitor = game.phase === 'lobby' || game.phase === 'gameover'
+
   return (
     <>
       <SoundToggle sound={sound} />
+      {isHost && canDecideMonitor && game.pendingMonitor && (
+        <MonitorPrompt pairCode={game.pendingMonitor.pairCode} onDecide={game.decideMonitor} />
+      )}
       {content()}
     </>
   )

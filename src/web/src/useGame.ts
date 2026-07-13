@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import type { HubConnection } from '@microsoft/signalr'
 import { createConnection, friendlyError } from './gameClient'
-import { clearSeat, loadMonitorToken, loadSeat, releaseSeatHold, saveSeat } from './session'
+import {
+  clearSeat,
+  loadMonitorToken,
+  loadSeat,
+  releaseSeatHold,
+  saveMonitorToken,
+  saveSeat,
+} from './session'
 import type {
   ActionDto,
   GameSnapshot,
   GameView,
   JoinResult,
   LobbyView,
+  MonitorDecisionView,
+  MonitorRequestView,
   PlayerLockedView,
   RoundResolvedView,
   RoundStartedView,
@@ -16,6 +25,7 @@ import type {
 export type UiPhase =
   | 'connecting'
   | 'joining' // player page only: no seat yet, show the join form
+  | 'pairing' // monitor page only: no monitor token, waiting for the host to hand one over
   | 'lobby'
   | 'selecting'
   | 'revealing'
@@ -50,6 +60,12 @@ interface State {
   resigned: boolean
   /** A monitor page is watching — rematches start from the monitor, not the phones. */
   hasMonitor: boolean
+  /** Some screen is asking to become the board; the host's device renders the prompt. */
+  pendingMonitor: MonitorRequestView | null
+  /** This screen's own request while it waits to be made the board (monitor mode). */
+  myRequest: MonitorRequestView | null
+  /** Why this screen is not the board: the host said no, a game is running, nobody answered. */
+  pairingError: string | null
 }
 
 const initial: State = {
@@ -69,6 +85,9 @@ const initial: State = {
   reveal: null,
   resigned: false,
   hasMonitor: false,
+  pendingMonitor: null,
+  myRequest: null,
+  pairingError: null,
 }
 
 type Msg =
@@ -85,6 +104,9 @@ type Msg =
   | { type: 'returnedToLobby'; lobby: LobbyView }
   | { type: 'stopped' }
   | { type: 'monitorPresence'; hasMonitor: boolean }
+  | { type: 'monitorRequested'; request: MonitorRequestView | null }
+  | { type: 'pairing'; request: MonitorRequestView }
+  | { type: 'pairingRefused'; error: string }
   | { type: 'startReveal'; job: RevealJob }
   | { type: 'revealDone'; view: RoundResolvedView; nextJob: RevealJob | null }
 
@@ -128,6 +150,7 @@ function reduce(state: State, msg: Msg): State {
         actionError: null,
         resigned: v.snapshot?.players.find((p) => p.id === playerId)?.isResigned ?? false,
         hasMonitor: v.hasMonitor,
+        pendingMonitor: v.pendingMonitor,
       }
     }
     case 'lobbyUpdated':
@@ -182,6 +205,12 @@ function reduce(state: State, msg: Msg): State {
       return { ...state, phase: 'stopped', deadline: null, locked: null, reveal: null }
     case 'monitorPresence':
       return { ...state, hasMonitor: msg.hasMonitor }
+    case 'monitorRequested':
+      return { ...state, pendingMonitor: msg.request }
+    case 'pairing':
+      return { ...state, phase: 'pairing', myRequest: msg.request, pairingError: null }
+    case 'pairingRefused':
+      return { ...state, phase: 'pairing', myRequest: null, pairingError: msg.error }
     case 'startReveal':
       return { ...state, phase: 'revealing', reveal: msg.job, locked: null, actionError: null }
     case 'revealDone': {
@@ -217,6 +246,10 @@ export interface GameApi extends State {
   resign(): Promise<void>
   rematch(): Promise<void>
   stop(): Promise<void>
+  /** Host: answer the screen asking to become the board. */
+  decideMonitor(allow: boolean): Promise<void>
+  /** This screen: ask (again) to be made the board. */
+  requestMonitor(): Promise<void>
   finishReveal(): void
 }
 
@@ -274,10 +307,11 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
       dispatch({ type: 'lobbyUpdated', lobby })
     })
 
-    // A player without a seat is only watching the lobby from the join form —
-    // game events must not yank the form away (joining then fails server-side
-    // with "already started", which the form surfaces).
-    const seated = () => mode === 'monitor' || tokenRef.current !== null
+    // A device without a role is only watching: a player without a seat (the join
+    // form's live lobby), or a screen still waiting to be made the board. Game
+    // events must not yank either screen away from what it is doing.
+    const seated = () =>
+      mode === 'monitor' ? monitorTokenRef.current !== null : tokenRef.current !== null
 
     conn.on('RoundStarted', (view: RoundStartedView) => {
       if (disposed || !seated()) return
@@ -315,6 +349,30 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
       if (!disposed) dispatch({ type: 'monitorPresence', hasMonitor })
     })
 
+    // Group-wide, and harmless: it carries no authority. Only the host's device
+    // renders the prompt, and only the host's control token can answer it.
+    conn.on('MonitorRequested', (request: MonitorRequestView | null) => {
+      if (!disposed) dispatch({ type: 'monitorRequested', request })
+    })
+
+    // The host answered *this* screen's request (monitor mode only — the server
+    // sends it to the asking connection alone).
+    conn.on('MonitorDecision', (decision: MonitorDecisionView) => {
+      if (disposed) return
+      if (!decision.granted || !decision.monitorToken) {
+        dispatch({
+          type: 'pairingRefused',
+          error: decision.message ?? "The host didn't add this screen.",
+        })
+        return
+      }
+      // We are the board now: keep the token like a screen that hosted the game,
+      // so a reload comes straight back as the monitor.
+      monitorTokenRef.current = decision.monitorToken
+      saveMonitorToken(code, decision.monitorToken)
+      hydrate().catch((e) => dispatch({ type: 'fatal', error: friendlyError(e) }))
+    })
+
     conn.on('RoundResolved', (view: RoundResolvedView) => {
       if (disposed || !seated()) return
       const prev = snapshotRef.current ?? view.snapshot
@@ -332,11 +390,15 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
       if (mode === 'monitor') {
         const monitorToken = monitorTokenRef.current
         if (!monitorToken) {
-          // Someone opened a monitor URL on a screen that never hosted this game.
-          dispatch({
-            type: 'fatal',
-            error: 'This screen is not the monitor for that game. Host a game to run one here.',
-          })
+          // A screen that never hosted this game: the phone → TV handoff. Ask the
+          // host to make us the board and show the pair code while we wait. A
+          // refusal (a game is running) is retriable, not fatal.
+          try {
+            const request = await conn.invoke<MonitorRequestView>('RequestMonitor', code)
+            if (!disposed) dispatch({ type: 'pairing', request })
+          } catch (e) {
+            if (!disposed) dispatch({ type: 'pairingRefused', error: friendlyError(e) })
+          }
           return
         }
         const view = await conn.invoke<GameView>('WatchAsMonitor', code, monitorToken)
@@ -398,6 +460,34 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
       conn.stop().catch(() => {})
     }
   }, [code, mode])
+
+  // A monitor request dies on the server's clock whether or not anyone acts on it.
+  // Run the same clock down on both sides, or a host who never noticed the prompt
+  // leaves the waiting screen on "waiting for the host" forever — and leaves himself
+  // an Allow button that can only fail. The server sends seconds left, not an
+  // instant, so a device with a skewed clock still expires it at the right moment.
+
+  // The screen that asked: stop waiting, and offer to ask again.
+  const myRequest = state.myRequest
+  useEffect(() => {
+    if (!myRequest) return
+    const timer = setTimeout(
+      () => dispatch({ type: 'pairingRefused', error: 'No answer from the host — ask again.' }),
+      myRequest.expiresInSeconds * 1000,
+    )
+    return () => clearTimeout(timer)
+  }, [myRequest])
+
+  // The host: take the dead prompt off the screen.
+  const pendingMonitor = state.pendingMonitor
+  useEffect(() => {
+    if (!pendingMonitor) return
+    const timer = setTimeout(
+      () => dispatch({ type: 'monitorRequested', request: null }),
+      pendingMonitor.expiresInSeconds * 1000,
+    )
+    return () => clearTimeout(timer)
+  }, [pendingMonitor])
 
   const invoke = useCallback(
     async (method: string, ...args: unknown[]): Promise<unknown> => {
@@ -533,6 +623,29 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
     }
   }, [code, invoke, controlToken])
 
+  const decideMonitor = useCallback(
+    async (allow: boolean) => {
+      try {
+        await invoke('DecideMonitor', code, controlToken(), allow)
+      } catch (e) {
+        dispatch({ type: 'actionError', error: friendlyError(e) })
+      }
+      // Either way the request is spent — drop the prompt even if the call raced
+      // another host device answering first.
+      dispatch({ type: 'monitorRequested', request: null })
+    },
+    [code, invoke, controlToken],
+  )
+
+  const requestMonitor = useCallback(async () => {
+    try {
+      const request = (await invoke('RequestMonitor', code)) as MonitorRequestView
+      dispatch({ type: 'pairing', request })
+    } catch (e) {
+      dispatch({ type: 'pairingRefused', error: friendlyError(e) })
+    }
+  }, [code, invoke])
+
   const finishReveal = useCallback(() => {
     const current = state.reveal
     if (!current) return
@@ -553,6 +666,8 @@ export function useGame(code: string, mode: 'player' | 'monitor'): GameApi {
     resign,
     rematch,
     stop,
+    decideMonitor,
+    requestMonitor,
     finishReveal,
   }
 }

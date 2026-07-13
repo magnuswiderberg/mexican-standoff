@@ -14,12 +14,15 @@ public sealed class StandoffServerFactory : WebApplicationFactory<Program>
 {
     public int SelectionTimerSeconds { get; init; }
     public bool BotsEnabled { get; init; }
+    /// <summary>Default is the production two minutes; expiry tests shorten it.</summary>
+    public TimeSpan MonitorRequestLifetime { get; init; } = TimeSpan.FromMinutes(2);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) =>
         builder.ConfigureServices(services =>
             services.Configure<GameOptions>(o =>
             {
                 o.SelectionTimerSeconds = SelectionTimerSeconds;
+                o.MonitorRequestLifetime = MonitorRequestLifetime;
                 o.Bots.Enabled = BotsEnabled;
                 o.Bots.ThinkMilliseconds = 0; // bots act immediately in tests
             }));
@@ -39,6 +42,8 @@ public sealed class GameClient : IAsyncDisposable
     private readonly Channel<LobbyView> _returnedToLobby = Channel.CreateUnbounded<LobbyView>();
     private readonly Channel<bool> _stopped = Channel.CreateUnbounded<bool>();
     private readonly Channel<bool> _monitorPresence = Channel.CreateUnbounded<bool>();
+    private readonly Channel<MonitorRequestView?> _monitorRequests = Channel.CreateUnbounded<MonitorRequestView?>();
+    private readonly Channel<MonitorDecisionView> _monitorDecisions = Channel.CreateUnbounded<MonitorDecisionView>();
 
     private GameClient(HubConnection hub)
     {
@@ -50,6 +55,8 @@ public sealed class GameClient : IAsyncDisposable
         hub.On<LobbyView>("ReturnedToLobby", v => _returnedToLobby.Writer.TryWrite(v));
         hub.On("GameStopped", () => _stopped.Writer.TryWrite(true));
         hub.On<bool>("MonitorPresence", v => _monitorPresence.Writer.TryWrite(v));
+        hub.On<MonitorRequestView?>("MonitorRequested", v => _monitorRequests.Writer.TryWrite(v));
+        hub.On<MonitorDecisionView>("MonitorDecision", v => _monitorDecisions.Writer.TryWrite(v));
     }
 
     public static async Task<GameClient> ConnectAsync(StandoffServerFactory factory)
@@ -104,6 +111,12 @@ public sealed class GameClient : IAsyncDisposable
     public Task Stop(string code, string? controlToken = null) =>
         _hub.InvokeAsync("StopGame", code, controlToken ?? MonitorToken);
 
+    /// <summary>A screen with no monitor token asking the host to make it the board.</summary>
+    public Task<MonitorRequestView> RequestMonitor(string code) =>
+        _hub.InvokeAsync<MonitorRequestView>("RequestMonitor", code);
+    public Task DecideMonitor(string code, string? controlToken, bool allow) =>
+        _hub.InvokeAsync("DecideMonitor", code, controlToken ?? MonitorToken, allow);
+
     public Task<LobbyView> NextLobby() => Next(_lobby);
     public Task<RoundStartedView> NextRound() => Next(_rounds);
     public Task<PlayerLockedView> NextLock() => Next(_locks);
@@ -111,6 +124,9 @@ public sealed class GameClient : IAsyncDisposable
     public Task<LobbyView> NextReturnedToLobby() => Next(_returnedToLobby);
     public Task NextStopped() => Next(_stopped);
     public Task<bool> NextMonitorPresence() => Next(_monitorPresence);
+    /// <summary>Null means the pending request was answered and the prompt should go away.</summary>
+    public Task<MonitorRequestView?> NextMonitorRequest() => Next(_monitorRequests);
+    public Task<MonitorDecisionView> NextMonitorDecision() => Next(_monitorDecisions);
 
     private static async Task<T> Next<T>(Channel<T> channel)
     {

@@ -57,6 +57,26 @@ public sealed record RoundResolvedView(
     IReadOnlyList<string>? WinnerIds,
     string? WinReason);
 
+/// <summary>
+/// A screen is asking to become the board. Broadcast to the game group, because
+/// it carries no authority — only the host's control token can answer it. The pair
+/// code is on the asking screen, so the host approves the TV they can actually see.
+/// <para>
+/// The remaining life travels as seconds, not as an instant: a phone with a skewed
+/// clock would otherwise retire the prompt early — or sit on a dead one. Both sides
+/// run it down (the screen stops waiting, the host's prompt goes away), so neither
+/// is left staring at a request the server has already forgotten.
+/// </para>
+/// </summary>
+public sealed record MonitorRequestView(string PairCode, int ExpiresInSeconds);
+
+/// <summary>
+/// The answer to a waiting screen, sent to it alone — it carries the monitor token
+/// on approval, which must never reach the game group. A refusal carries why: the
+/// host said no, or the game started before they got to it.
+/// </summary>
+public sealed record MonitorDecisionView(bool Granted, string? MonitorToken, string? Message = null);
+
 /// <summary>Full current state, for the monitor page and reconnecting players.</summary>
 public sealed record GameView(
     string Phase,
@@ -67,4 +87,7 @@ public sealed record GameView(
     bool HasSubmitted,
     IReadOnlyList<string>? WinnerIds,
     string? WinReason,
-    bool HasMonitor = false);
+    bool HasMonitor = false,
+    /// <summary>A screen waiting on the host right now — so a host who reloads
+    /// mid-request still sees the prompt, with its real remaining life.</summary>
+    MonitorRequestView? PendingMonitor = null);

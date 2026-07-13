@@ -175,6 +175,7 @@ public sealed class GameService(
         var session = Require(code);
         RoundStartedView view;
         int nonce;
+        MonitorRequest? abandoned;
         lock (session.Lock)
         {
             ThrowIfStopped(session);
@@ -183,6 +184,11 @@ public sealed class GameService(
                 throw new HubException("The game has already started.");
             if (session.Players.Count < Parameters.MinPlayers)
                 throw new HubException($"At least {Parameters.MinPlayers} players are needed.");
+
+            // The host started instead of answering the screen waiting to be the board.
+            // Say so, rather than leaving it on "waiting for the host" for a whole game.
+            abandoned = LiveMonitorRequest(session);
+            session.PendingMonitor = null;
 
             foreach (var player in session.Players)
                 player.Resigned = false;
@@ -196,6 +202,8 @@ public sealed class GameService(
         ScheduleTimeout(session, nonce);
         ScheduleAutoActions(session, nonce);
         await hub.Clients.Group(session.Code).RoundStarted(view);
+        if (abandoned is not null)
+            await AnswerMonitorAsync(session, abandoned, granted: false, "The game started — ask again when it ends.");
     }
 
     public async Task SubmitActionAsync(string code, string token, ActionDto dto)
@@ -398,6 +406,86 @@ public sealed class GameService(
         await hub.Clients.Group(session.Code).GameStopped();
     }
 
+    /// <summary>
+    /// The phone → TV handoff. A screen with no monitor token (the game was started
+    /// on a phone, or the big screen lost its storage) asks to become the board.
+    /// Anyone with the game code may ask — asking grants nothing, the host's Allow
+    /// is what hands the token over. One request at a time: a second screen replaces
+    /// the first, so the prompt cannot be stacked up on the host.
+    /// </summary>
+    public async Task<MonitorRequestView> RequestMonitorAsync(string code, string connectionId)
+    {
+        var session = Require(code);
+        MonitorRequestView view;
+        lock (session.Lock)
+        {
+            ThrowIfStopped(session);
+            // Between games only. Mid-round the prompt would land on the host's phone
+            // on top of the action picker, and nobody sets up a TV during a duel —
+            // they play the game out first.
+            if (session.Phase == GamePhase.Selecting)
+                throw new HubException("A board goes up between games — ask again when this one ends.");
+
+            session.PendingMonitor = new MonitorRequest(Codes.New(), connectionId, DateTimeOffset.UtcNow);
+            view = ViewOf(session.PendingMonitor);
+        }
+
+        await hub.Clients.Group(session.Code).MonitorRequested(view);
+        return view;
+    }
+
+    /// <summary>
+    /// The host (or a monitor already up) answers the waiting screen. Approving sends
+    /// the monitor token to that one connection — never to the group, where any phone
+    /// on the wifi could pick it up and take the room's controls.
+    /// </summary>
+    public async Task DecideMonitorAsync(string code, string? controlToken, bool allow)
+    {
+        var session = Require(code);
+        MonitorRequest request;
+        lock (session.Lock)
+        {
+            ThrowIfStopped(session);
+            RequireController(session, controlToken, "let a screen show the board");
+
+            var pending = session.PendingMonitor;
+            session.PendingMonitor = null;
+            if (pending is null || DateTimeOffset.UtcNow - pending.RequestedAt > MonitorRequestLifetime)
+                throw new HubException("That screen is no longer waiting.");
+            request = pending;
+        }
+
+        await AnswerMonitorAsync(session, request, allow, allow ? null : "The host didn't add this screen.");
+    }
+
+    /// <summary>
+    /// Answers the screen that was waiting and takes the prompt off the host's phone.
+    /// The token goes to that one connection; the group only learns the request is
+    /// over. Caller must not hold the lock.
+    /// </summary>
+    private async Task AnswerMonitorAsync(GameSession session, MonitorRequest request, bool granted, string? message)
+    {
+        await hub.Clients.Client(request.ConnectionId)
+            .MonitorDecision(new MonitorDecisionView(granted, granted ? session.MonitorToken : null, message));
+        await hub.Clients.Group(session.Code).MonitorRequested(null);
+    }
+
+    /// <summary>A screen left waiting this long has given up; the host's prompt is stale.</summary>
+    private TimeSpan MonitorRequestLifetime => options.Value.MonitorRequestLifetime;
+
+    /// <summary>The pending request, or null if there is none or it has gone stale. Caller holds the lock.</summary>
+    private MonitorRequest? LiveMonitorRequest(GameSession session) =>
+        session.PendingMonitor is { } r && DateTimeOffset.UtcNow - r.RequestedAt <= MonitorRequestLifetime
+            ? r
+            : null;
+
+    /// <summary>What is left of a request's life, so both sides can run the same clock down.</summary>
+    private MonitorRequestView ViewOf(MonitorRequest request)
+    {
+        var left = request.RequestedAt + MonitorRequestLifetime - DateTimeOffset.UtcNow;
+        return new MonitorRequestView(request.PairCode, Math.Max(0, (int)left.TotalSeconds));
+    }
+
     /// <summary>Current full state for the monitor page or a reconnecting player.</summary>
     public GameView GetView(string code, string? token)
     {
@@ -420,7 +508,8 @@ public sealed class GameService(
                 hasSubmitted,
                 session.WinnerIds,
                 session.WinReason?.ToString(),
-                session.MonitorConnections.Count > 0);
+                session.MonitorConnections.Count > 0,
+                LiveMonitorRequest(session) is { } pending ? ViewOf(pending) : null);
         }
     }
 

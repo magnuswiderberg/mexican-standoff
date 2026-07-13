@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
 
 namespace MexicanStandoff.Server.Games;
@@ -13,10 +12,6 @@ public interface IGameStore
 
 public sealed class InMemoryGameStore(IOptions<GameOptions> options) : IGameStore
 {
-    // No lookalike characters (I/O/0/1) — codes are read aloud and typed on phones.
-    private const string CodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    private const int CodeLength = 4;
-
     private readonly ConcurrentDictionary<string, GameSession> _sessions = new();
 
     public GameSession Create()
@@ -24,12 +19,8 @@ public sealed class InMemoryGameStore(IOptions<GameOptions> options) : IGameStor
         Prune();
         while (true)
         {
-            // Crypto RNG: a code is short and public, but knowing one must not
-            // let anyone predict the codes of the games created around it.
-            var code = string.Concat(Enumerable.Range(0, CodeLength)
-                .Select(_ => CodeAlphabet[RandomNumberGenerator.GetInt32(CodeAlphabet.Length)]));
-            var session = new GameSession { Code = code, MonitorToken = Tokens.New() };
-            if (_sessions.TryAdd(code, session))
+            var session = new GameSession { Code = Codes.New(), MonitorToken = Tokens.New() };
+            if (_sessions.TryAdd(session.Code, session))
                 return session;
         }
     }

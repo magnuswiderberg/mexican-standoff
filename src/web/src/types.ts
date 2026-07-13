@@ -141,6 +141,22 @@ export interface RoundResolvedView {
   winReason: string | null
 }
 
+/** A screen asking to become the board; the host approves it by its pair code. */
+export interface MonitorRequestView {
+  pairCode: string
+  /** Life left, from the server's clock — both sides run it down so neither waits on a dead request. */
+  expiresInSeconds: number
+}
+
+/** The answer to a waiting screen, delivered only to the screen that asked. */
+export interface MonitorDecisionView {
+  granted: boolean
+  /** The monitor token, on approval — this is the whole point of the handoff. */
+  monitorToken: string | null
+  /** Why not, on a refusal: the host said no, or the game started first. */
+  message: string | null
+}
+
 export type ServerPhase = 'Lobby' | 'Selecting' | 'GameOver' | 'Stopped'
 
 export interface GameView {
@@ -154,4 +170,6 @@ export interface GameView {
   winReason: string | null
   /** A monitor page is watching — rematches start from the monitor, not the phones. */
   hasMonitor: boolean
+  /** A screen is waiting on the host right now, so a host who reloads still sees the prompt. */
+  pendingMonitor: MonitorRequestView | null
 }
