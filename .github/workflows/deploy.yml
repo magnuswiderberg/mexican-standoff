@@ -1,0 +1,100 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      botsEnabled:
+        description: 'Let the host add bot seats in production'
+        type: choice
+        options: ['false', 'true']
+        default: 'false'
+
+concurrency:
+  # A deploy restarts the app and wipes every in-memory game. One at a time, and
+  # never cancel one half-done.
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: rg-superherofight
+  WEBAPP_NAME: mexicanstandoff
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet test --configuration Release
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.infra.outputs.url }}
+    permissions:
+      id-token: write # OIDC login to Azure
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # `dotnet publish` builds the SPA (npm ci && npm run build, see the BuildSpa
+      # target in MexicanStandoff.Server.csproj), so the runner needs Node as much
+      # as it needs .NET.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/web/package-lock.json
+
+      - run: dotnet publish src/MexicanStandoff.Server -c Release -o publish
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Bots are a deploy-time switch: `workflow_dispatch` decides for a manual run,
+      # otherwise the BOTS_ENABLED repo variable does, otherwise they stay off. The
+      # app setting is redeployed every time, so flipping the variable and re-running
+      # is enough to turn them off again — no drift left behind in the portal.
+      - id: infra
+        name: Deploy infrastructure
+        run: |
+          az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --template-file infra/main.bicep \
+            --parameters name="$WEBAPP_NAME" botsEnabled=$BOTS_ENABLED \
+            --query properties.outputs.url.value -o tsv \
+            | sed 's/^/url=/' >> "$GITHUB_OUTPUT"
+        env:
+          BOTS_ENABLED: ${{ inputs.botsEnabled || vars.BOTS_ENABLED || 'false' }}
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.WEBAPP_NAME }}
+          package: publish
+
+      # The app answers before we call it deployed. /health is also what App Service
+      # polls, so a red step here is the same signal it would act on.
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsS "${{ steps.infra.outputs.url }}/health" | grep -q '"status":"ok"'; then
+              echo "healthy: ${{ steps.infra.outputs.url }}"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "no healthy response after 100s"
+          exit 1

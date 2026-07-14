@@ -16,7 +16,7 @@ in MVP.)
 ### 2. Core gameplay (engine)
 - [x] Full rules per [game-design.md](game-design.md): simultaneous-volley resolution, strictly-alone chests, loot-on-elimination with instant win.
 - [x] Final Duel (programmed 3-action sequences) at 2 players.
-- [x] Selection timer with auto-Dodge on timeout (server-side, configurable via `Game:SelectionTimerSeconds`).
+- [x] Selection timer with auto-Dodge on timeout (server-side). The host picks it per game in the lobby's game settings (default: no timer); `Game:SelectionTimerSeconds` is only the fallback for a `CreateGame` that sends no settings.
 - [x] All parameters injected via config (so simulation and live game share the engine) — `GameParameters`.
 
 ### 3. Player page (phone)
