@@ -1824,3 +1824,64 @@ h2 {
     width: 1.2em;
   }
 }
+
+/* ---- icon gallery (/_icons, unlisted showcase) --------------------------- */
+
+.icongallery .ig-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.7rem;
+}
+
+.icongallery .ig-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.3rem;
+  padding: 0.9rem 0.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.icongallery .ig-glyph {
+  font-size: 2.4rem;
+  line-height: 1;
+  height: 2.4rem;
+  display: flex;
+  align-items: center;
+}
+
+.icongallery .ig-name {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.72rem;
+  color: var(--ink);
+}
+
+.icongallery .ig-note {
+  font-size: 0.68rem;
+  color: var(--ink-dim);
+}
+
+.icongallery .ig-context {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin: 0.5rem 0;
+  font-size: 1.4rem;
+}
+
+.icongallery .ig-context-label {
+  flex: 0 0 8rem;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+}
+
+.icongallery .ig-beats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.4rem;
+  font-size: 3.4rem;
+  filter: drop-shadow(0 4px 14px rgb(0 0 0 / 55%));
+}

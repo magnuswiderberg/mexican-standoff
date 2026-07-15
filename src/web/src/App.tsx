@@ -3,6 +3,7 @@ import { HomePage } from './pages/HomePage'
 import { PlayerPage } from './pages/PlayerPage'
 import { MonitorPage } from './pages/MonitorPage'
 import { HowToPlayPage } from './pages/HowToPlayPage'
+import { IconGalleryPage } from './pages/IconGalleryPage'
 
 export function App() {
   const route = parseRoute(usePath())
@@ -14,6 +15,8 @@ export function App() {
       return <MonitorPage key={route.code} code={route.code} />
     case 'howto':
       return <HowToPlayPage />
+    case 'icons':
+      return <IconGalleryPage />
     default:
       return <HomePage />
   }

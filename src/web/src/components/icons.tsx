@@ -141,21 +141,17 @@ export function SkullIcon({ className }: { className?: string }) {
 }
 
 /**
- * Duel / standoff: two crossed six-shooters — chunky barrels up-and-out,
- * grip blocks down-and-out around a cylinder hub, so it reads as guns (not a
- * bare X) at the large stage size where it's used.
+ * Duel / standoff: two pistols facing off. Each gun is an L-silhouette
+ * (barrel + grip) pointing in from opposite corners — reads as a shootout
+ * rather than a bare X, which crossed barrels collapse to at any small size.
  */
 export function DuelIcon({ className }: { className?: string }) {
   return (
     <Icon className={className}>
-      {/* barrels */}
-      <path d="M3.2 5.2 4.8 3.6 13 11.8 11.4 13.4Z" />
-      <path d="M20.8 5.2 19.2 3.6 11 11.8 12.6 13.4Z" />
-      {/* grips */}
-      <path d="M12.8 12.2 18.4 15.4 16.8 18.4 11.6 15Z" />
-      <path d="M11.2 12.2 5.6 15.4 7.2 18.4 12.4 15Z" />
-      {/* cylinder hub */}
-      <circle cx="12" cy="12" r="2.4" />
+      {/* upper-left gun, muzzle pointing right toward centre */}
+      <path d="M2 5h13v2.3H5v4.2H2z" />
+      {/* lower-right gun, muzzle pointing left toward centre */}
+      <path d="M22 12.5H9v2.3h10V19h3z" />
     </Icon>
   )
 }
