@@ -55,6 +55,7 @@ body {
   color: var(--ink);
   font-family: Bitter, Georgia, 'Times New Roman', serif;
   -webkit-font-smoothing: antialiased;
+  padding-bottom: 2rem;
 }
 
 button {
@@ -299,6 +300,9 @@ h2 {
 
 /* Code on top, its two uses (take a seat / be the board) side by side underneath. */
 .join-form {
+  align-self: center;
+  width: 100%;
+  max-width: 20rem;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -341,6 +345,9 @@ h2 {
    Each button carries a one-line hint — which one you want depends on the room,
    not on the game. */
 .host-choices {
+  align-self: center;
+  width: 100%;
+  max-width: 20rem;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -455,8 +462,11 @@ h2 {
 .host-settings summary {
   cursor: pointer;
   text-align: center;
-  color: var(--ink-dim);
-  font-size: 0.9rem;
+  color: var(--accent);
+  font-size: 0.95rem;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
   list-style: none; /* the "Game settings" text is the affordance; no marker triangle */
 }
 
@@ -467,6 +477,7 @@ h2 {
 .host-settings[open] summary,
 .host-settings summary:hover {
   color: var(--ink);
+  text-decoration-color: var(--accent);
 }
 
 .setting-row {
@@ -543,14 +554,16 @@ h2 {
 /* Dim text link to the rules — on the home page and in the lobby. */
 .howto-link {
   text-align: center;
-  color: var(--ink-dim);
-  text-decoration: none;
-  font-size: 0.9rem;
+  color: var(--accent);
+  font-size: 0.95rem;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .howto-link:hover {
   color: var(--ink);
-  text-decoration: underline;
+  text-decoration-color: var(--accent);
 }
 
 .howto {
