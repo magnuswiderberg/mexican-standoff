@@ -149,7 +149,7 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
           ? [
               who(acts[0].playerId),
               t(`: ${describeAction(acts[0].action, state.chestCount)}`),
-              t(' ⚔️ '),
+              t(' vs '),
               who(acts[1].playerId),
               t(`: ${describeAction(acts[1].action, state.chestCount)}`),
             ]
@@ -264,7 +264,7 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
               who(step.playerId),
               t(` resigns — ${lost === 1 ? '1 gold bar' : `${lost} gold bars`} left on the table!`),
             ]
-          : [who(step.playerId), t(' resigns and walks away. 🏳️')]
+          : [who(step.playerId), t(' resigns and walks away.')]
       break
     }
     case 'actionFizzled': {

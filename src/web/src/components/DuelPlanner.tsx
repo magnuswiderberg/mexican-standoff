@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ActionDto, ActionType, GameSnapshot } from '../types'
 import { accentOf } from '../avatars'
-import { AttackIcon, BulletIcon, ChestIcon, DodgeIcon, LoadIcon } from './icons'
+import { AttackIcon, BulletIcon, ChestIcon, DodgeIcon, LoadIcon, SkullIcon } from './icons'
 
 /**
  * Final Duel: program a full sequence of actions up front. Legality mirrors
@@ -103,9 +103,13 @@ export function DuelPlanner({
   return (
     <div className="picker duel-planner">
       <div className="duel-banner">
-        ⚔️ {snapshot.players.length === 2 ? 'Duel' : 'Final Duel'} vs{' '}
+        {snapshot.players.length === 2 ? 'Duel' : 'Final Duel'} vs{' '}
         <strong style={{ color: accentOf(opponent.avatar) }}>{opponent.name}</strong>
-        {snapshot.suddenDeath && <div className="sudden-death">☠️ Sudden death — free bullet, no chest!</div>}
+        {snapshot.suddenDeath && (
+          <div className="sudden-death">
+            <SkullIcon /> Sudden death — free bullet, no chest!
+          </div>
+        )}
       </div>
       <p className="hint">
         Program all {length} moves, then watch them play out. Attack needs a bullet in the gun —

@@ -3,6 +3,7 @@ import { createConnection, friendlyError } from '../gameClient'
 import { navigate } from '../router'
 import { saveMonitorToken } from '../session'
 import { Logo } from '../components/Logo'
+import { StarIcon } from '../components/icons'
 import { HowToPlayLink } from './HowToPlayPage'
 import type { CreateGameResult, CreateGameSettings } from '../types'
 
@@ -70,18 +71,18 @@ export function HomePage() {
           starting the game. */}
       <div className="host-choices">
         <button className="primary" onClick={() => hostGame('player')} disabled={creating !== null}>
-          {creating === 'player' ? 'Creating…' : '🤠 Host & play'}
+          {creating === 'player' ? 'Creating…' : <><StarIcon /> Host &amp; play</>}
         </button>
         <p className="hint host-hint">Start a game on this phone — the others scan you to join.</p>
 
         <button className="secondary" onClick={() => hostGame('monitor')} disabled={creating !== null}>
-          {creating === 'monitor' ? 'Creating…' : '📺 Host on a big screen'}
+          {creating === 'monitor' ? 'Creating…' : 'Host on a big screen'}
         </button>
         <p className="hint host-hint">Put the board on a TV or laptop; everyone plays on their phone.</p>
       </div>
 
       <details className="host-settings">
-        <summary>⚙️ Game settings</summary>
+        <summary>Game settings</summary>
         <label className="setting-row">
           <span>Selection timer</span>
           <select value={timerSeconds} onChange={(e) => setTimerSeconds(Number(e.target.value))}>
@@ -114,7 +115,7 @@ export function HomePage() {
         />
         <div className="code-actions">
           <button className="secondary" type="submit" disabled={!hasCode}>
-            🤠 Join as player
+            Join as player
           </button>
           {/* The monitor page does the asking: this screen has no token, so it
               shows a pair code and waits for the host to allow it. */}
@@ -124,7 +125,7 @@ export function HomePage() {
             disabled={!hasCode}
             onClick={() => navigate(`/monitor/${code.trim().toUpperCase()}`)}
           >
-            📺 Show the board
+            Show the board
           </button>
         </div>
       </form>

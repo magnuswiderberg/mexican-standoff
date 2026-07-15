@@ -92,7 +92,7 @@ export interface PlayerLockedView {
   totalExpected: number
   /** Everyone who has locked in so far — drives the per-tile ✓ badges. */
   lockedPlayerIds: string[]
-  /** Resigned (or mid-game-kicked) players — shows the 🏳️ before the snapshot catches up. */
+  /** Resigned (or mid-game-kicked) players — shows the surrender flag before the snapshot catches up. */
   resignedPlayerIds: string[]
 }
 

@@ -4,7 +4,18 @@ import type { ActionDto } from '../types'
 import { chestName } from '../reveal'
 import type { DisplayPlayer } from '../reveal'
 import { accentOf, avatarOf, avatarUrl } from '../avatars'
-import { AttackIcon, BulletIcon, ChestIcon, DodgeIcon, LoadIcon } from './icons'
+import {
+  AttackIcon,
+  BulletIcon,
+  ChestIcon,
+  DodgeIcon,
+  FlagIcon,
+  GoldBarIcon,
+  HitIcon,
+  HpIcon,
+  LoadIcon,
+  SkullIcon,
+} from './icons'
 
 export interface BoardPlayer {
   id: string
@@ -29,11 +40,11 @@ export interface ShotFx {
 }
 
 /**
- * Big dramatic-beat emoji for a reveal step. With a `playerId` it pops over
+ * Big dramatic-beat icon for a reveal step. With a `playerId` it pops over
  * that player's tile (the actor), otherwise center stage over the whole board.
  */
 export interface StageFx {
-  icon: string
+  icon: ReactNode
   playerId: string | null
   key: number
 }
@@ -224,14 +235,14 @@ export function PlayerBoard({
                 {p.id === meId && <span className="you-badge">you</span>}
                 {resigned && p.isAlive && (
                   <span className="you-badge resigned-badge" title="Resigned — only dodging">
-                    🏳️
+                    <FlagIcon />
                   </span>
                 )}
               </div>
               <div className="tile-stats">
-                <Pips count={p.hp} max={maxHp} symbol="❤️" empty="🖤" />
+                <Pips count={p.hp} max={maxHp} symbol={<HpIcon className="pip-hp" />} />
                 <Pips count={p.bullets} max={maxBullets} symbol={<BulletIcon className="pip-bullet" />} />
-                <Pips count={p.gold} max={Math.max(goldToWin, p.gold)} symbol="🪙" overlap />
+                <Pips count={p.gold} max={Math.max(goldToWin, p.gold)} symbol={<GoldBarIcon className="pip-gold" />} overlap />
               </div>
               {/* Distinct keys: the placeholder and the real chip must be separate
                   elements, or React reuses the node and the card flip never plays. */}
@@ -255,7 +266,7 @@ export function PlayerBoard({
               <TileKick name={p.name} onKick={() => onKick(p.id)} />
             )}
             {!p.isAlive && <div className="tile-out">OUT</div>}
-            {f.eliminated && <div className="tile-skull">☠️</div>}
+            {f.eliminated && <div className="tile-skull"><SkullIcon /></div>}
             {stage && stage.playerId === p.id && (
               <div className="tile-stage" key={`stage${stage.key}`} aria-hidden>
                 {stage.icon}
@@ -263,17 +274,17 @@ export function PlayerBoard({
             )}
             {f.dodging && (
               <span key={`dg${animKey}`} className="dodge-fx" aria-hidden>
-                💨
+                <DodgeIcon />
               </span>
             )}
             {f.hit && (
               <span key={`hp${animKey}`} className="float float-hurt">
-                −1 ❤️
+                −1 <HpIcon />
               </span>
             )}
             {(f.goldGained ?? 0) > 0 && (
               <span key={`au${animKey}`} className="float float-gold">
-                +{f.goldGained} 🪙
+                +{f.goldGained} <GoldBarIcon />
               </span>
             )}
           </div>
@@ -302,7 +313,7 @@ export function PlayerBoard({
             className={`impact ${shot.hit ? 'impact-hit' : 'impact-miss'}`}
             style={{ left: line.x2, top: line.y2 }}
           >
-            {shot.hit ? '💥' : '💨'}
+            {shot.hit ? <HitIcon /> : <DodgeIcon />}
           </div>
         </div>
       )}

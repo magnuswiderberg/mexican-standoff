@@ -7,22 +7,27 @@ import { accentOf } from '../avatars'
 import { PlayerBoard } from './PlayerBoard'
 import type { ShotFx, StageFx } from './PlayerBoard'
 import { Confetti } from './Confetti'
+import { DuelIcon, GoldBarIcon, SkullIcon, StarIcon } from './icons'
 
 /**
- * Big stage emoji for the dramatic beats; null for quiet steps. Single-actor
+ * Big stage icon for the dramatic beats; null for quiet steps. Single-actor
  * beats (a chest grab) anchor to that player's tile; multi-actor beats
  * (standoff, elimination + skull-on-tile, victory) stay center stage.
  */
 function stageFx(step: RevealStepDto, key: number): StageFx | null {
   switch (step.type) {
     case 'chestResolved':
-      if (step.chestWinnerId) return { icon: '💰', playerId: step.chestWinnerId, key }
-      if ((step.contenderIds?.length ?? 0) > 1) return { icon: '⚔️', playerId: null, key }
+      if (step.chestWinnerId) return { icon: <GoldBarIcon className="fx-gold" />, playerId: step.chestWinnerId, key }
+      if ((step.contenderIds?.length ?? 0) > 1) return { icon: <DuelIcon className="fx-danger" />, playerId: null, key }
       return null
     case 'playerEliminated':
-      return { icon: '☠️', playerId: null, key }
+      return { icon: <SkullIcon />, playerId: null, key }
     case 'gameEnded':
-      return { icon: (step.winnerIds?.length ?? 0) > 0 ? '🏆' : '💀', playerId: null, key }
+      return {
+        icon: (step.winnerIds?.length ?? 0) > 0 ? <StarIcon className="fx-gold" /> : <SkullIcon />,
+        playerId: null,
+        key,
+      }
     default:
       return null
   }

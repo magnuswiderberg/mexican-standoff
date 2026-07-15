@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { arrivedInApp, navigate } from '../router'
 import { Logo } from '../components/Logo'
-import { AttackIcon, BulletIcon, ChestIcon, DodgeIcon, LoadIcon } from '../components/icons'
+import { AttackIcon, BulletIcon, ChestIcon, DodgeIcon, GoldBarIcon, HpIcon, LoadIcon } from '../components/icons'
 import type { RulesView } from '../types'
 
 /** Rendered until /api/rules answers (and standalone if it never does). */
@@ -24,7 +24,7 @@ export function HowToPlayLink() {
         navigate('/how-to-play')
       }}
     >
-      📖 How to play
+      How to play
     </a>
   )
 }
@@ -58,8 +58,8 @@ export function HowToPlayPage() {
       <section>
         <h2>The goal</h2>
         <p>
-          Be the first to collect <strong>{rules.goldToWin} gold bars 🪙</strong> — or be the{' '}
-          <strong>last one standing</strong>. You have <strong>{rules.startingHp} ❤️</strong> and a
+          Be the first to collect <strong>{rules.goldToWin} gold bars <GoldBarIcon /></strong> — or be the{' '}
+          <strong>last one standing</strong>. You have <strong>{rules.startingHp} <HpIcon /></strong> and a
           gun that holds <strong>{rules.maxBullets} bullets</strong>. Everyone starts with an{' '}
           <em>empty</em> gun.
         </p>
@@ -136,12 +136,12 @@ export function HowToPlayPage() {
             you shoot each other, you both get hit.
           </li>
           <li>
-            <strong>Getting hit cancels your Load or Chest.</strong> You lose the ❤️ <em>and</em>{' '}
+            <strong>Getting hit cancels your Load or Chest.</strong> You lose the <HpIcon /> <em>and</em>{' '}
             come away empty-handed. Dodge is your only defense.
           </li>
           <li>Un-hit loaders get their bullet; lone un-hit grabbers get their gold.</li>
           <li>
-            Anyone at 0 ❤️ is out. Their gold is <strong>looted</strong> — split between everyone
+            Anyone at 0 <HpIcon /> is out. Their gold is <strong>looted</strong> — split between everyone
             who shot them this round.
           </li>
         </ol>

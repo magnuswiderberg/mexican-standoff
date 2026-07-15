@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 
 /**
  * Two-tap button for destructive actions (resign, stop game): the first tap
@@ -10,8 +11,8 @@ export function ConfirmButton({
   onConfirm,
   className = '',
 }: {
-  label: string
-  confirmLabel: string
+  label: ReactNode
+  confirmLabel: ReactNode
   onConfirm: () => void
   className?: string
 }) {

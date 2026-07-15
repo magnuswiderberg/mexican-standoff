@@ -400,7 +400,7 @@ h2 {
   text-align: center;
   color: var(--ink-dim);
   font-size: 0.9rem;
-  list-style: none; /* the 📲 is the affordance; no marker triangle */
+  list-style: none; /* the "Invite players" text is the affordance; no marker triangle */
 }
 
 .invite summary::-webkit-details-marker {
@@ -457,7 +457,7 @@ h2 {
   text-align: center;
   color: var(--ink-dim);
   font-size: 0.9rem;
-  list-style: none; /* the ⚙️ is the affordance; no marker triangle */
+  list-style: none; /* the "Game settings" text is the affordance; no marker triangle */
 }
 
 .host-settings summary::-webkit-details-marker {
@@ -755,6 +755,15 @@ h2 {
   color: #cfa14f;
 }
 
+/* HP pips: a small shield in danger red. Gold pips: ingots in the gold accent. */
+.pip-hp {
+  color: var(--danger);
+}
+
+.pip-gold {
+  color: var(--accent);
+}
+
 .tile-action {
   margin-top: 0.4rem;
   background: var(--bg-raised);
@@ -871,6 +880,7 @@ h2 {
   top: 50%;
   right: 0.5rem;
   font-size: 1.6em;
+  color: var(--dodge);
   pointer-events: none;
   z-index: 4;
   animation: dodge-puff 1.1s ease-out both;
@@ -909,6 +919,7 @@ h2 {
   align-items: center;
   justify-content: center;
   font-size: 2.6em;
+  color: var(--ink);
   pointer-events: none;
   animation: stage-pop 1s 0.5s both;
 }
@@ -1230,6 +1241,15 @@ h2 {
   animation: impact-pop 0.6s 0.3s both;
 }
 
+/* The emoji carried their own color; the line-art icons inherit currentColor. */
+.impact-hit {
+  color: var(--danger);
+}
+
+.impact-miss {
+  color: var(--dodge);
+}
+
 /* ---- stage icon (chest / elimination / trophy) --------------------------- */
 
 .reveal-board {
@@ -1269,6 +1289,16 @@ h2 {
 
 .page.tv .tile-stage {
   font-size: 4.5rem;
+}
+
+/* Per-beat tint for the stage icons (gold grab / winner star, standoff clash);
+   a bare skull inherits the parchment ink. */
+.fx-gold {
+  color: var(--accent);
+}
+
+.fx-danger {
+  color: var(--danger);
 }
 
 /* ---- confetti ------------------------------------------------------------ */
@@ -1545,6 +1575,8 @@ h2 {
 .resigned-badge {
   background: var(--bg-raised);
   border: 1px solid var(--line);
+  /* Override the you-badge's dark ink — the flag icon draws in currentColor. */
+  color: var(--ink-dim);
 }
 
 .winner-banner-tv {

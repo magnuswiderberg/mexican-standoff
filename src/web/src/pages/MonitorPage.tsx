@@ -9,6 +9,7 @@ import { SoundToggle } from '../components/SoundToggle'
 import { Confetti } from '../components/Confetti'
 import { ConfirmButton } from '../components/ConfirmButton'
 import { Logo } from '../components/Logo'
+import { SkullIcon, StarIcon } from '../components/icons'
 import { accentOf } from '../avatars'
 import { navigate } from '../router'
 
@@ -52,7 +53,7 @@ export function MonitorPage({ code }: { code: string }) {
             {game.pairingError ? (
               <>
                 {/* The host said no, or a game is running — either way, retriable. */}
-                <div className="waiting-banner">🚫 {game.pairingError}</div>
+                <div className="waiting-banner">{game.pairingError}</div>
                 <button className="primary" onClick={game.requestMonitor}>
                   Ask again
                 </button>
@@ -127,7 +128,7 @@ export function MonitorPage({ code }: { code: string }) {
                 </button>
                 {game.lobby?.botsEnabled && (game.lobby?.players.length ?? 0) < 8 && (
                   <button className="secondary" onClick={game.addBot}>
-                    🤖 Add a bot
+                    Add a bot
                   </button>
                 )}
               </div>
@@ -143,9 +144,9 @@ export function MonitorPage({ code }: { code: string }) {
               <span>
                 {/* Both counters track completed rounds/volleys; we're selecting the next one. */}
                 {snapshot.isDuel
-                  ? `⚔️ ${snapshot.players.length === 2 ? 'Duel' : 'Final Duel'} — Volley ${snapshot.duelVolley + 1}`
+                  ? `${snapshot.players.length === 2 ? 'Duel' : 'Final Duel'} — Volley ${snapshot.duelVolley + 1}`
                   : `Round ${snapshot.roundNumber + 1}`}
-                {snapshot.suddenDeath && ' ☠️'}
+                {snapshot.suddenDeath && <> <SkullIcon /></>}
               </span>
               <span className="code">{code}</span>
               <Countdown deadline={game.deadline} onUrgentTick={() => sound.play('tick')} />
@@ -188,7 +189,7 @@ export function MonitorPage({ code }: { code: string }) {
         return (
           <div className="page tv center">
             <Logo />
-            <div className="waiting-banner">🛑 The game was stopped.</div>
+            <div className="waiting-banner">The game was stopped.</div>
             <button className="primary" onClick={() => navigate('/')}>
               Back to start
             </button>
@@ -208,10 +209,10 @@ export function MonitorPage({ code }: { code: string }) {
             </div>
             <div className="winner-banner winner-banner-tv">
               {nobodyWon ? (
-                '💀 Mutual destruction — nobody wins!'
+                <><SkullIcon /> Mutual destruction — nobody wins!</>
               ) : (
                 <>
-                  🏆{' '}
+                  <StarIcon />{' '}
                   {winners?.map((p, i) => (
                     <span key={p.id}>
                       {i > 0 && ' & '}
@@ -232,7 +233,7 @@ export function MonitorPage({ code }: { code: string }) {
             )}
             {game.actionError && <div className="error">{game.actionError}</div>}
             <button className="primary" onClick={game.rematch}>
-              🔁 Back to lobby
+              Back to lobby
             </button>
           </div>
         )
@@ -274,7 +275,7 @@ export function MonitorPage({ code }: { code: string }) {
       )}
       {canStop && (
         <div className="monitor-stop">
-          <ConfirmButton label="🛑 Stop game" confirmLabel="🛑 Stop for everyone?" onConfirm={game.stop} />
+          <ConfirmButton label="Stop game" confirmLabel="Stop for everyone?" onConfirm={game.stop} />
         </div>
       )}
     </>

@@ -11,6 +11,7 @@ import { SoundToggle } from '../components/SoundToggle'
 import { Confetti } from '../components/Confetti'
 import { ConfirmButton } from '../components/ConfirmButton'
 import { InvitePanel } from '../components/InvitePanel'
+import { FlagIcon, SkullIcon, StarIcon } from '../components/icons'
 import { HowToPlayLink } from './HowToPlayPage'
 import { AVATARS, accentOf, avatarOf, avatarUrl } from '../avatars'
 import type { LobbyView } from '../types'
@@ -125,7 +126,7 @@ function MonitorPrompt({
   return (
     <div className="monitor-prompt">
       <p>
-        📺 A screen wants to show the board. Does it say <span className="code">{pairCode}</span>?
+        A screen wants to show the board. Does it say <span className="code">{pairCode}</span>?
       </p>
       <div className="monitor-prompt-actions">
         <button className="primary" onClick={() => onDecide(true)}>
@@ -227,7 +228,7 @@ export function PlayerPage({ code }: { code: string }) {
             )}
             {isHost && game.lobby?.botsEnabled && (game.lobby?.players.length ?? 0) < 8 && (
               <button className="secondary" onClick={game.addBot}>
-                🤖 Add a bot
+                Add a bot
               </button>
             )}
             <button className="secondary" onClick={game.leave}>
@@ -255,8 +256,8 @@ export function PlayerPage({ code }: { code: string }) {
         const resignButton = alive && !resigned && (
           <ConfirmButton
             className="resign-btn"
-            label="🏳️ Resign"
-            confirmLabel="🏳️ Tap again to resign"
+            label={<><FlagIcon /> Resign</>}
+            confirmLabel={<><FlagIcon /> Tap again to resign</>}
             onConfirm={game.resign}
           />
         )
@@ -266,7 +267,7 @@ export function PlayerPage({ code }: { code: string }) {
               <span>
                 {/* Both counters track completed rounds/volleys; we're selecting the next one. */}
                 {snapshot.isDuel
-                  ? `⚔️ ${snapshot.players.length === 2 ? 'Duel' : 'Final Duel'} — Volley ${snapshot.duelVolley + 1}`
+                  ? `${snapshot.players.length === 2 ? 'Duel' : 'Final Duel'} — Volley ${snapshot.duelVolley + 1}`
                   : `Round ${snapshot.roundNumber + 1}`}
               </span>
               <Countdown deadline={game.deadline} />
@@ -274,7 +275,7 @@ export function PlayerPage({ code }: { code: string }) {
 
             {!alive ? (
               <>
-                <div className="spectator-banner">☠️ You're out — spectating.</div>
+                <div className="spectator-banner"><SkullIcon /> You're out — spectating.</div>
                 <PlayerBoard
                   players={snapshot.players}
                   maxHp={snapshot.startingHp}
@@ -295,7 +296,7 @@ export function PlayerPage({ code }: { code: string }) {
               </>
             ) : resigned ? (
               <>
-                <div className="waiting-banner">🏳️ You've resigned — you're out when this round ends.</div>
+                <div className="waiting-banner"><FlagIcon /> You've resigned — you're out when this round ends.</div>
                 {game.locked && (
                   <LockProgress locked={game.locked.lockedCount} total={game.locked.totalExpected} />
                 )}
@@ -315,7 +316,7 @@ export function PlayerPage({ code }: { code: string }) {
                 <div className="waiting-banner">
                   {game.submittedAction ? (
                     <>
-                      🔒 Locked in: {actionLabel(game.submittedAction, snapshot.chestCount)}
+                      Locked in: {actionLabel(game.submittedAction, snapshot.chestCount)}
                       {submittedTarget && (
                         <>
                           {' → '}
@@ -327,7 +328,7 @@ export function PlayerPage({ code }: { code: string }) {
                     </>
                   ) : game.submittedSequence ? (
                     <>
-                      🔒 Locked in:{' '}
+                      Locked in:{' '}
                       {game.submittedSequence.map((a, i) => (
                         <span key={i}>
                           {i > 0 && ' → '}
@@ -336,7 +337,7 @@ export function PlayerPage({ code }: { code: string }) {
                       ))}
                     </>
                   ) : (
-                    '🔒 Locked in.'
+                    'Locked in.'
                   )}
                 </div>
                 {game.locked ? (
@@ -421,7 +422,7 @@ export function PlayerPage({ code }: { code: string }) {
       case 'stopped':
         return (
           <div className="page center">
-            <div className="waiting-banner">🛑 The game was stopped.</div>
+            <div className="waiting-banner">The game was stopped.</div>
             <p className="hint">Thanks for playing — round up the gang for another one!</p>
             <button className="primary" onClick={() => navigate('/')}>
               Back to start
@@ -449,10 +450,10 @@ export function PlayerPage({ code }: { code: string }) {
             )}
             <div className="winner-banner">
               {nobodyWon ? (
-                '💀 Mutual destruction — nobody wins!'
+                <><SkullIcon /> Mutual destruction — nobody wins!</>
               ) : (
                 <>
-                  🏆{' '}
+                  <StarIcon />{' '}
                   {iWon
                     ? 'You win!'
                     : winners?.map((p, i) => (
@@ -476,10 +477,10 @@ export function PlayerPage({ code }: { code: string }) {
             )}
             {game.actionError && <div className="error">{game.actionError}</div>}
             {game.hasMonitor ? (
-              <p className="hint">📺 The next game starts from the monitor.</p>
+              <p className="hint">The next game starts from the monitor.</p>
             ) : isHost ? (
               <button className="primary" onClick={game.rematch}>
-                🔁 Play again — back to lobby
+                Play again — back to lobby
               </button>
             ) : (
               <p className="hint">The host starts the next game.</p>

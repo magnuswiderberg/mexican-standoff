@@ -38,7 +38,7 @@ function ShareButton({ label, title, text, url }: { label: string; title: string
 
   return (
     <button type="button" className="secondary" onClick={share}>
-      {copied ? '✅ Link copied' : label}
+      {copied ? 'Link copied' : label}
     </button>
   )
 }
@@ -58,14 +58,14 @@ export function InvitePanel({ code, alone }: { code: string; alone: boolean }) {
 
   return (
     <details className="invite" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>📲 Invite players</summary>
+      <summary>Invite players</summary>
       <div className="invite-body">
         <div className="qr-panel">
           <QRCode value={joinUrl} size={200} bgColor="#f5ead6" fgColor="#171310" />
         </div>
         <div className="code code-big">{code}</div>
         <ShareButton
-          label="🔗 Share link"
+          label="Share link"
           title="Mexican Standoff"
           text={`Join my standoff — code ${code}`}
           url={joinUrl}
@@ -76,12 +76,12 @@ export function InvitePanel({ code, alone }: { code: string; alone: boolean }) {
             still has to ask, and the host still has to say yes. */}
         <div className="invite-board">
           <p className="hint">
-            📺 Got a TV or laptop? Open <strong>{location.host}</strong> on it, enter{' '}
+            Got a TV or laptop? Open <strong>{location.host}</strong> on it, enter{' '}
             <span className="code">{code}</span> and tap <strong>Show the board</strong>
             {canShare && ' — or just send it the board link'}. You'll get a code to confirm.
           </p>
           <ShareButton
-            label="📺 Share board link"
+            label="Share board link"
             title="Mexican Standoff — the board"
             text={`Show the Mexican Standoff board (game ${code}) on this screen`}
             url={boardUrl}

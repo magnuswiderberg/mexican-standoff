@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ActionDto, ActionType, GameSnapshot } from '../types'
 import { Avatar } from './PlayerBoard'
-import { AttackIcon, ChestIcon, DodgeIcon, LoadIcon } from './icons'
+import { AttackIcon, ChestIcon, DodgeIcon, LoadIcon, TargetIcon } from './icons'
 
 interface CardSpec {
   type: ActionType
@@ -122,7 +122,7 @@ export function ActionPicker({
               className={`target ${targetId === p.id ? 'target-picked' : ''}`}
               onClick={() => setTargetId(p.id)}
             >
-              🎯 <Avatar avatar={p.avatar} name={p.name} /> {p.name}
+              <TargetIcon /> <Avatar avatar={p.avatar} name={p.name} /> {p.name}
             </button>
           ))}
         </div>
