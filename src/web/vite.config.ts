@@ -17,5 +17,17 @@ export default defineConfig({
   build: {
     outDir: '../MexicanStandoff.Server/wwwroot',
     emptyOutDir: true,
+    rollupOptions: {
+      // SignalR's ESM has /*#__PURE__*/ annotations Rollup can't attach; it
+      // strips them and warns. Harmless vendor noise — keep it out of the log.
+      onwarn(warning, warn) {
+        if (
+          warning.code === 'INVALID_ANNOTATION' &&
+          warning.message.includes('/*#__PURE__*/')
+        )
+          return
+        warn(warning)
+      },
+    },
   },
 })

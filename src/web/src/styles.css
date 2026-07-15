@@ -285,7 +285,7 @@ h2 {
 
 .splash img {
   display: block;
-  width: min(100%, 30rem);
+  width: min(80%, 30rem);
   margin: 0 auto;
   /* Soft fade at the rim: the artwork's edges are already ~var(--bg), the mask
      just guarantees no visible seam on displays that crush or lift blacks. */
