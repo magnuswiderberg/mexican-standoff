@@ -199,7 +199,11 @@ export function PlayerBoard({
 
   return (
     // Two tiles = head-to-head: the revealed-action chips scale up (see .board-two).
-    <div className={players.length === 2 ? 'board board-two' : 'board'} ref={boardRef}>
+    <div
+      className={players.length === 2 ? 'board board-two' : 'board'}
+      data-count={players.length}
+      ref={boardRef}
+    >
       {players.map((p, i) => {
         const f = p.flags ?? {}
         const resigned = p.isResigned || (resignedIds?.includes(p.id) ?? false)

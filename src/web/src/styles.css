@@ -117,9 +117,11 @@ h2 {
 /* Read from across the room: fill the screen and center vertically instead
    of huddling in the upper third. */
 .page.tv {
-  max-width: 72rem;
-  font-size: 1.35rem;
-  gap: 1.3rem;
+  /* Fill the screen on a big display instead of a thin centered strip, but keep
+     a hard cap so tiles don't turn cartoonish on an ultra-wide TV. */
+  max-width: min(100rem, 94vw);
+  font-size: 1.5rem;
+  gap: 1.5rem;
   min-height: 100vh;
   justify-content: center;
   padding-top: 1.5rem;
@@ -130,8 +132,37 @@ h2 {
   font-size: 3.2rem;
 }
 
+/* Narrow monitor windows (small TVs, a laptop half-screen, a phone showing the
+   board): stay fluid — as many 14rem tiles as fit, never fewer than two. */
 .page.tv .board {
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+}
+
+/* Desktop monitor: with at most 8 seats, pick a fixed column count per seat
+   count so the table fills the width in balanced rows (≤2 rows, never a lonely
+   single-tile row) instead of a ragged auto-fit run. */
+@media (min-width: 60rem) {
+  .page.tv .board[data-count='3'] { grid-template-columns: repeat(3, 1fr); }
+  .page.tv .board[data-count='4'] { grid-template-columns: repeat(2, 1fr); }
+  .page.tv .board[data-count='5'],
+  .page.tv .board[data-count='6'] { grid-template-columns: repeat(3, 1fr); }
+  .page.tv .board[data-count='7'],
+  .page.tv .board[data-count='8'] { grid-template-columns: repeat(4, 1fr); }
+
+  /* Few rows leave a lot of black above and below — let each tile grow into it
+     (portrait strip stretches to match) and center the stats block in the taller
+     card so the extra height reads as presence, not empty padding. */
+  .page.tv .board .tile {
+    min-height: min(15rem, 34vh);
+  }
+  .page.tv .tile-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .page.tv .avatar-tile {
+    width: clamp(3rem, 24%, 7rem);
+  }
 }
 
 .page.tv .caption {
