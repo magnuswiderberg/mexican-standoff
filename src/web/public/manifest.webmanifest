@@ -1,0 +1,16 @@
+{
+  "name": "Mexican Standoff",
+  "short_name": "Standoff",
+  "description": "A fast realtime party game for 2–8 players.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070403",
+  "theme_color": "#070403",
+  "icons": [
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}
