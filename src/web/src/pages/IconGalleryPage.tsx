@@ -5,6 +5,7 @@ import {
   AttackIcon,
   BulletIcon,
   ChestIcon,
+  ContestedChestIcon,
   DodgeIcon,
   DuelIcon,
   FlagIcon,
@@ -43,8 +44,9 @@ const ACTIONS: Swatch[] = [
 const STATE: Swatch[] = [
   { name: 'HpIcon', node: <HpIcon className="pip-hp" />, note: 'Health pips' },
   { name: 'GoldBarIcon', node: <GoldBarIcon className="pip-gold" />, note: 'Gold pips, chest grab' },
+  { name: 'ContestedChestIcon', node: <ContestedChestIcon className="fx-danger" />, note: 'Contested chest — nobody wins' },
   { name: 'SkullIcon', node: <SkullIcon />, note: 'Elimination, mutual destruction' },
-  { name: 'DuelIcon', node: <DuelIcon className="fx-danger" />, note: 'Standoff stage beat' },
+  { name: 'DuelIcon', node: <DuelIcon className="fx-danger" />, note: 'Standoff / shootout (unused)' },
   { name: 'FlagIcon', node: <FlagIcon />, note: 'Resign' },
   { name: 'StarIcon', node: <StarIcon className="fx-gold" />, note: 'Winner, host action' },
   { name: 'TargetIcon', node: <TargetIcon />, note: 'Pick who to shoot' },
@@ -144,7 +146,7 @@ export function IconGalleryPage() {
         <h2>Dramatic beats (stage size)</h2>
         <div className="ig-beats">
           <GoldBarIcon className="fx-gold" />
-          <DuelIcon className="fx-danger" />
+          <ContestedChestIcon className="fx-danger" />
           <SkullIcon />
           <StarIcon className="fx-gold" />
           <HitIcon className="impact-hit" />

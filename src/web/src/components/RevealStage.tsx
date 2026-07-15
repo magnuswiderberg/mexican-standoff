@@ -7,7 +7,7 @@ import { accentOf } from '../avatars'
 import { PlayerBoard } from './PlayerBoard'
 import type { ShotFx, StageFx } from './PlayerBoard'
 import { Confetti } from './Confetti'
-import { DuelIcon, GoldBarIcon, SkullIcon, StarIcon } from './icons'
+import { ContestedChestIcon, GoldBarIcon, SkullIcon, StarIcon } from './icons'
 
 /**
  * Big stage icon for the dramatic beats; null for quiet steps. Single-actor
@@ -18,7 +18,7 @@ function stageFx(step: RevealStepDto, key: number): StageFx | null {
   switch (step.type) {
     case 'chestResolved':
       if (step.chestWinnerId) return { icon: <GoldBarIcon className="fx-gold" />, playerId: step.chestWinnerId, key }
-      if ((step.contenderIds?.length ?? 0) > 1) return { icon: <DuelIcon className="fx-danger" />, playerId: null, key }
+      if ((step.contenderIds?.length ?? 0) > 1) return { icon: <ContestedChestIcon className="fx-danger" />, playerId: null, key }
       return null
     case 'playerEliminated':
       return { icon: <SkullIcon />, playerId: null, key }

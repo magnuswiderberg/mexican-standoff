@@ -82,6 +82,31 @@ export function ChestIcon({ className }: { className?: string }) {
   )
 }
 
+/**
+ * Contested chest: the treasure chest struck through — two or more grabbers
+ * reached the same chest, so nobody walks off with the bar. Its own beat so a
+ * scramble over loot doesn't borrow the DuelIcon and read as a shootout.
+ */
+export function ContestedChestIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+        <path d="M3.5 10.5Q3.5 4.5 12 4.5T20.5 10.5V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18Z" />
+        <path d="M3.5 10.5h17" />
+      </g>
+      <rect x="10.3" y="8.6" width="3.4" height="5" rx="1" />
+      {/* struck through — nobody claims it */}
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        d="M5.5 5.5 18.5 18.5"
+      />
+    </Icon>
+  )
+}
+
 /** Ammo pip: a cartridge standing on its rim. */
 export function BulletIcon({ className }: { className?: string }) {
   return (
