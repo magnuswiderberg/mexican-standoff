@@ -15,6 +15,10 @@ public sealed class TurtleBot : IBot
         if (opponents.Any(p => p.Bullets > 0))
             return PlayerAction.Dodge.Instance;
 
+        // Nobody armed: a turtle banks durability to the ceiling before anything else.
+        if (BotHelpers.CanHeal(state, myId))
+            return PlayerAction.Heal.Instance;
+
         if (me.Bullets < state.Parameters.MaxBullets)
             return PlayerAction.Load.Instance;
 

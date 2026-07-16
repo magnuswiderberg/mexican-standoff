@@ -11,6 +11,7 @@ import {
   DodgeIcon,
   FlagIcon,
   GoldBarIcon,
+  HealIcon,
   HitIcon,
   HpIcon,
   LoadIcon,
@@ -59,6 +60,8 @@ export function actionLabel(action: ActionDto, chestCount: number): ReactNode {
       return <><AttackIcon /> Attack</>
     case 'chest':
       return <><ChestIcon /> {chestName(action.chestIndex, chestCount)}</>
+    case 'heal':
+      return <><HealIcon /> Heal</>
   }
 }
 
@@ -214,6 +217,7 @@ export function PlayerBoard({
           f.dodging && 'tile-dodge',
           f.shooting && 'tile-shooting',
           f.loaded && 'tile-loaded',
+          f.healed && 'tile-healed',
           f.gotGold && 'tile-gold',
           f.cancelled && 'tile-cancelled',
           f.eliminated && 'tile-eliminated',
@@ -286,9 +290,19 @@ export function PlayerBoard({
                 −1 <HpIcon />
               </span>
             )}
+            {(f.hpGained ?? 0) > 0 && (
+              <span key={`hl${animKey}`} className="float float-heal">
+                +{f.hpGained} <HpIcon />
+              </span>
+            )}
             {(f.goldGained ?? 0) > 0 && (
               <span key={`au${animKey}`} className="float float-gold">
                 +{f.goldGained} <GoldBarIcon />
+              </span>
+            )}
+            {(f.goldSpent ?? 0) > 0 && (
+              <span key={`as${animKey}`} className="float float-gold-spent">
+                −{f.goldSpent} <GoldBarIcon />
               </span>
             )}
           </div>

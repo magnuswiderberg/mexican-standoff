@@ -25,6 +25,8 @@ public static class ActionValidator
                 ? $"no chest with index {chest.ChestIndex}"
                 : null,
 
+            PlayerAction.Heal => ValidateHeal(state, player),
+
             _ => "unknown action",
         };
     }
@@ -42,6 +44,17 @@ public static class ActionValidator
         if (!target.IsAlive)
             return "target is already eliminated";
 
+        return null;
+    }
+
+    private static string? ValidateHeal(GameState state, PlayerState player)
+    {
+        if (!state.Parameters.HealingEnabled)
+            return "healing is disabled";
+        if (player.Hp >= state.Parameters.MaxHp)
+            return "already at full HP";
+        if (player.Gold < state.Parameters.HealCost)
+            return "not enough gold to heal";
         return null;
     }
 }

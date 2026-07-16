@@ -64,6 +64,12 @@ public sealed class GameSession
     /// </summary>
     public int SelectionTimerSeconds { get; set; }
 
+    /// <summary>
+    /// Engine parameters for this game, chosen at creation (host's settings panel,
+    /// e.g. the healing toggle) — immutable after, and reused across rematches.
+    /// </summary>
+    public GameParameters Parameters { get; set; } = GameParameters.Default;
+
     /// <summary>Total seats ever issued — ids stay unique even after lobby leaves/kicks.</summary>
     public int SeatsIssued { get; set; }
     public GameState? State { get; set; }

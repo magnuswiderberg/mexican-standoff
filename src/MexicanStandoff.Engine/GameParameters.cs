@@ -7,7 +7,30 @@ namespace MexicanStandoff.Engine;
 public sealed record GameParameters
 {
     public int StartingHp { get; init; } = 2;
+
+    /// <summary>
+    /// HP ceiling. Only matters when <see cref="HealingEnabled"/> is on (nothing
+    /// else raises HP); defaults to the starting HP, so healing without raising
+    /// this is just a "patch back to full" toggle.
+    /// </summary>
+    public int MaxHp { get; init; } = 2;
     public int MaxBullets { get; init; } = 2;
+
+    /// <summary>Whether the Heal action card is available (v2 experiment; off by default).</summary>
+    public bool HealingEnabled { get; init; }
+
+    /// <summary>Gold bars spent per Heal.</summary>
+    public int HealCost { get; init; } = 2;
+
+    /// <summary>HP restored per Heal (capped at <see cref="MaxHp"/>).</summary>
+    public int HealAmount { get; init; } = 1;
+
+    /// <summary>
+    /// When a heal is cancelled by a hit, whether the gold is refunded (true, the
+    /// Load-like treatment) or spent anyway (false, the default — healing under
+    /// fire is a gamble, which is the tension the mechanic is there for).
+    /// </summary>
+    public bool HealCostRefundedOnCancel { get; init; }
 
     /// <summary>Bullets in the gun at game start (capped at <see cref="MaxBullets"/>).</summary>
     public int StartingBullets { get; init; }

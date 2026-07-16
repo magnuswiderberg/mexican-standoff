@@ -29,6 +29,10 @@ public sealed class AdaptiveBot : IBot
         if (leader is not null && me.Bullets > 0)
             return new PlayerAction.Attack(leader.Id);
 
+        // Wounded below our starting HP with a calm table: patch back up.
+        if (me.Hp < state.Parameters.StartingHp && BotHelpers.ShouldHeal(state, myId))
+            return PlayerAction.Heal.Instance;
+
         // Under heavy threat: mostly dodge.
         if (armedOpponents >= Math.Max(1, opponents.Count / 2) && rng.NextDouble() < 0.5)
             return PlayerAction.Dodge.Instance;

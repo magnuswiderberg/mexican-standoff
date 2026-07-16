@@ -16,6 +16,8 @@ export type SfxName =
   | 'standoff'
   | 'eliminated'
   | 'cancel'
+  | 'heal'
+  | 'coin'
   | 'fanfare'
   | 'tick'
 
@@ -148,6 +150,17 @@ export function playSfx(name: SfxName): void {
     case 'cancel': // fizzle
       noise(c, { dur: 0.3, filter: 'bandpass', freq: 900, freqEnd: 200, vol: 0.25, q: 3 })
       tone(c, { freq: 400, freqEnd: 180, dur: 0.25, type: 'triangle', vol: 0.15 })
+      break
+    case 'heal': { // tonic glugs down — warm rising two-note with a soft cork pop
+      tone(c, { freq: 300, dur: 0.04, type: 'sine', vol: 0.18 }) // cork
+      tone(c, { at: 0.06, freq: 523, dur: 0.35, type: 'triangle', vol: 0.24 })
+      tone(c, { at: 0.2, freq: 784, dur: 0.5, type: 'triangle', vol: 0.24 })
+      tone(c, { at: 0.2, freq: 1568, dur: 0.3, type: 'sine', vol: 0.06 }) // shimmer
+      break
+    }
+    case 'coin': // bars clink away — bright falling dyad
+      tone(c, { freq: 1320, freqEnd: 660, dur: 0.18, type: 'triangle', vol: 0.2 })
+      tone(c, { at: 0.05, freq: 990, freqEnd: 495, dur: 0.2, type: 'square', vol: 0.08 })
       break
     case 'fanfare': { // winner ceremony
       const melody: [number, number][] = [

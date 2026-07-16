@@ -14,6 +14,9 @@ public sealed record GameSnapshot(
     int GoldToWin,
     int MaxBullets,
     int StartingHp,
+    int MaxHp,
+    bool HealingEnabled,
+    int HealCost,
     int DuelSequenceLength,
     IReadOnlyList<PlayerSnapshot> Players);
 

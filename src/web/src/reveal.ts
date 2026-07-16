@@ -27,9 +27,14 @@ export interface DisplayPlayer {
     hit?: boolean
     cancelled?: boolean
     loaded?: boolean
+    healed?: boolean
     gotGold?: boolean
     /** Gold gained on this step (drives the floating "+n" indicator). */
     goldGained?: number
+    /** Gold spent on this step (heal cost, or bars burned on a shot-off heal). */
+    goldSpent?: number
+    /** HP restored on this step (floating "+n" over the tile). */
+    hpGained?: number
     eliminated?: boolean
     winner?: boolean
   }
@@ -81,6 +86,8 @@ export function stepDuration(step: RevealStepDto): number {
       return 1600
     case 'gunLoaded':
       return 1200
+    case 'playerHealed':
+      return 1800
     case 'suddenDeathBullet':
       return 1600
     case 'chestResolved':
@@ -114,6 +121,8 @@ function describeAction(action: ActionDto, chestCount: number): string {
       return 'Attack'
     case 'chest':
       return chestName(action.chestIndex, chestCount)
+    case 'heal':
+      return 'Heal'
   }
 }
 
@@ -175,8 +184,19 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
     }
     case 'actionCancelled': {
       const p = byId.get(step.playerId ?? '')
-      if (p) p.flags.cancelled = true
-      caption = [who(step.playerId), t(` was hit — ${describeAction(step.action!, state.chestCount)} is cancelled!`)]
+      const wasted = step.goldLost ?? 0
+      if (p) {
+        p.flags.cancelled = true
+        // A shot-off heal (no-refund) also burns the bars it was going to cost.
+        if (step.action?.type === 'heal' && wasted > 0) {
+          p.gold = Math.max(0, p.gold - wasted)
+          p.flags.goldSpent = wasted
+        }
+      }
+      caption =
+        step.action?.type === 'heal' && wasted > 0
+          ? [who(step.playerId), t(` was hit — heal cancelled, ${wasted === 1 ? '1 bar' : `${wasted} bars`} wasted!`)]
+          : [who(step.playerId), t(` was hit — ${describeAction(step.action!, state.chestCount)} is cancelled!`)]
       break
     }
     case 'gunLoaded': {
@@ -186,6 +206,23 @@ export function applyStep(state: DisplayState, step: RevealStepDto): DisplayStat
         p.flags.loaded = true
       }
       caption = [who(step.playerId), t(' loads a bullet.')]
+      break
+    }
+    case 'playerHealed': {
+      const p = byId.get(step.playerId ?? '')
+      const cost = step.goldLost ?? 0
+      if (p) {
+        const gained = Math.max(0, (step.hpNow ?? p.hp) - p.hp)
+        p.hp = step.hpNow ?? p.hp
+        p.gold = Math.max(0, p.gold - cost)
+        p.flags.healed = true
+        if (gained > 0) p.flags.hpGained = gained
+        if (cost > 0) p.flags.goldSpent = cost
+      }
+      caption = [
+        who(step.playerId),
+        t(` patches up${cost > 0 ? ` for ${cost === 1 ? '1 bar' : `${cost} bars`}` : ''}.`),
+      ]
       break
     }
     case 'suddenDeathBullet': {

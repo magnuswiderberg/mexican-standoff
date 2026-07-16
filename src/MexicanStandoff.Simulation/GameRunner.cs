@@ -8,7 +8,8 @@ public sealed record GameOutcome(
     WinReason? Reason,
     int Rounds,
     bool TimedOut,
-    int GoldLostToRounding);
+    int GoldLostToRounding,
+    int Heals);
 
 /// <summary>
 /// Plays one full game with a bot per seat, orchestrating normal rounds and
@@ -25,11 +26,12 @@ public static class GameRunner
 
         // Gold lost to the loot split rounding down (excludes abandoned resigner gold).
         var goldLostToRounding = 0;
+        var heals = 0;
 
         while (true)
         {
             if (state.RoundNumber >= maxRounds)
-                return new GameOutcome([], null, state.RoundNumber, TimedOut: true, goldLostToRounding);
+                return new GameOutcome([], null, state.RoundNumber, TimedOut: true, goldLostToRounding, heals);
 
             var result = state.IsDuel
                 ? DuelResolver.Resolve(state, state.AlivePlayers.ToDictionary(
@@ -40,12 +42,13 @@ public static class GameRunner
                     p => BotPlay.ChooseSafe(state, p.Id, botBySeat[p.Id], rng)));
 
             goldLostToRounding += result.Reveal.OfType<RevealStep.PlayerEliminated>().Sum(e => e.GoldLost);
+            heals += result.Reveal.OfType<RevealStep.PlayerHealed>().Count();
 
             state = result.NewState;
             if (result.IsGameOver)
             {
                 var winners = result.WinnerIds!.Select(id => botBySeat[id].StrategyName).ToList();
-                return new GameOutcome(winners, result.WinReason, state.RoundNumber, TimedOut: false, goldLostToRounding);
+                return new GameOutcome(winners, result.WinReason, state.RoundNumber, TimedOut: false, goldLostToRounding, heals);
             }
         }
     }

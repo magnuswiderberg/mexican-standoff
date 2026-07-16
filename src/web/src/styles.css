@@ -533,6 +533,25 @@ h2 {
   border-color: var(--accent);
 }
 
+/* The checkbox rows carry a hint under the label; keep the control aligned right. */
+.setting-row > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.setting-note {
+  color: var(--muted, #9a8c73);
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+}
+
+.setting-row input[type='checkbox'] {
+  width: 1.4rem;
+  height: 1.4rem;
+  accent-color: var(--good);
+  flex: none;
+}
+
 .lobby-list {
   list-style: none;
   margin: 0;
@@ -616,6 +635,14 @@ h2 {
   color: var(--accent);
   border-bottom: 1px solid var(--line);
   padding-bottom: 0.3rem;
+}
+
+/* "(if enabled)" tag on an optional-rule heading — quieter than the title. */
+.howto-optional {
+  color: var(--muted, #9a8c73);
+  font-size: 0.8rem;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .howto p {
@@ -946,6 +973,12 @@ h2 {
   box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
+.tile-healed {
+  border-color: var(--good);
+  animation: pop 0.5s;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--good) 55%, transparent);
+}
+
 .tile-cancelled {
   border-color: var(--danger);
   border-style: dashed;
@@ -1241,8 +1274,20 @@ h2 {
   color: #ff8a75;
 }
 
+.float-heal {
+  color: var(--good);
+  top: 30%; /* clears the −gold float when both fire on a heal */
+}
+
 .float-gold {
   color: var(--accent);
+}
+
+/* Bars burned on a shot-off heal — same gold, but leaving. */
+.float-gold-spent {
+  color: var(--accent);
+  opacity: 0.85;
+  top: 58%;
 }
 
 /* ---- shot tracer --------------------------------------------------------- */

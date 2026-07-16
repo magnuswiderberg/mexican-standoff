@@ -133,6 +133,28 @@ export function GoldBarIcon({ className }: { className?: string }) {
   )
 }
 
+/** Heal: a tonic bottle with a remedy plus — snake-oil health, not a modern cross. */
+export function HealIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      {/* cork */}
+      <rect x="10" y="2" width="4" height="2.4" rx="0.6" />
+      {/* neck */}
+      <rect x="10.5" y="4" width="3" height="2.6" />
+      {/* bottle body */}
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        d="M7.5 8.4Q7.5 6.6 9.3 6.6h5.4Q16.5 6.6 16.5 8.4V19a1.9 1.9 0 0 1-1.9 1.9H9.4A1.9 1.9 0 0 1 7.5 19Z"
+      />
+      {/* remedy plus */}
+      <path d="M11 10.8h2v2.2h2.2v2h-2.2v2.2h-2v-2.2H8.8v-2H11z" />
+    </Icon>
+  )
+}
+
 /** HP pip: a small shield — a hit taken, not a cutesy heart. */
 export function HpIcon({ className }: { className?: string }) {
   return (

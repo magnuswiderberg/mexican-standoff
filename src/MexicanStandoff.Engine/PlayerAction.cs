@@ -25,4 +25,10 @@ public abstract record PlayerAction
 
     /// <summary>Attempt to take a gold bar from the given chest.</summary>
     public sealed record OpenChest(int ChestIndex) : PlayerAction;
+
+    /// <summary>Spend gold to restore HP. An investment action: a hit cancels it (like Load).</summary>
+    public sealed record Heal : PlayerAction
+    {
+        public static readonly Heal Instance = new();
+    }
 }

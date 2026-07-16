@@ -33,6 +33,12 @@ public sealed class GameService(
         var session = store.Create();
         var seconds = settings?.SelectionTimerSeconds ?? options.Value.SelectionTimerSeconds;
         session.SelectionTimerSeconds = Math.Clamp(seconds, 0, 600);
+        // Healing is the recommended v2 config: heal up to 3 HP for 2 gold, no
+        // refund if shot off (see docs/simulation-results.md). Other tunables stay
+        // at the engine defaults.
+        session.Parameters = settings?.Healing == true
+            ? Parameters with { HealingEnabled = true, MaxHp = 3 }
+            : Parameters;
         return new CreateGameResult(session.Code, session.MonitorToken);
     }
 
@@ -192,7 +198,7 @@ public sealed class GameService(
 
             foreach (var player in session.Players)
                 player.Resigned = false;
-            session.State = GameState.New(Parameters, session.Players.Select(p => (p.Id, p.Name)).ToArray());
+            session.State = GameState.New(session.Parameters, session.Players.Select(p => (p.Id, p.Name)).ToArray());
             session.WinnerIds = null;
             session.WinReason = null;
             nonce = BeginSelectionLocked(session);
@@ -759,6 +765,9 @@ public sealed class GameService(
             state.Parameters.GoldToWin,
             state.Parameters.MaxBullets,
             state.Parameters.StartingHp,
+            state.Parameters.MaxHp,
+            state.Parameters.HealingEnabled,
+            state.Parameters.HealCost,
             state.Parameters.DuelSequenceLength,
             state.Players
                 .Select(p => new PlayerSnapshot(

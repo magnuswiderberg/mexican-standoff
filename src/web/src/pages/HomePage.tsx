@@ -24,6 +24,7 @@ export function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState<HostAs | null>(null)
   const [timerSeconds, setTimerSeconds] = useState(0)
+  const [healing, setHealing] = useState(false)
 
   const hasCode = code.trim().length >= 4
 
@@ -39,7 +40,7 @@ export function HomePage() {
     const conn = createConnection()
     try {
       await conn.start()
-      const settings: CreateGameSettings = { selectionTimerSeconds: timerSeconds }
+      const settings: CreateGameSettings = { selectionTimerSeconds: timerSeconds, healing }
       const game = await conn.invoke<CreateGameResult>('CreateGame', settings)
       // Keep the monitor token either way: it is what lets this screen start,
       // stop and kick. Hosting as a player we don't need it (the host's own seat
@@ -92,6 +93,13 @@ export function HomePage() {
               </option>
             ))}
           </select>
+        </label>
+        <label className="setting-row">
+          <span>
+            Healing
+            <small className="setting-note">Spend gold to patch up — but a bullet wastes it.</small>
+          </span>
+          <input type="checkbox" checked={healing} onChange={(e) => setHealing(e.target.checked)} />
         </label>
       </details>
 

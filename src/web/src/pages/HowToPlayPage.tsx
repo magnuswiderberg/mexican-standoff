@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { arrivedInApp, navigate } from '../router'
 import { Logo } from '../components/Logo'
-import { AttackIcon, BulletIcon, ChestIcon, DodgeIcon, GoldBarIcon, HpIcon, LoadIcon } from '../components/icons'
+import { AttackIcon, BulletIcon, ChestIcon, DodgeIcon, GoldBarIcon, HealIcon, HpIcon, LoadIcon } from '../components/icons'
 import type { RulesView } from '../types'
 
 /** Rendered until /api/rules answers (and standalone if it never does). */
@@ -148,6 +148,23 @@ export function HowToPlayPage() {
         <p>
           Out of the game? You spectate — and get a one-tap seat in the rematch. Dead players never
           win, even if loot pushes them past {rules.goldToWin} gold.
+        </p>
+      </section>
+
+      <section>
+        <h2>Healing <span className="howto-optional">(if enabled)</span></h2>
+        <p>
+          The host can switch on a fifth card,{' '}
+          <span className="howto-action-name">
+            <HealIcon /> Heal
+          </span>
+          . Spend <strong>2 gold bars <GoldBarIcon /></strong> to patch up <strong>1 <HpIcon /></strong> —
+          and you can bank <em>past</em> your starting {rules.startingHp} <HpIcon />, up to <strong>3</strong>.
+        </p>
+        <p>
+          But healing is an investment, like Load: a bullet cancels it. Get shot while patching up and
+          you lose the <HpIcon /> <em>and</em> the gold — it's a gamble on nobody drawing on you. Not
+          available in the Final Duel.
         </p>
       </section>
 

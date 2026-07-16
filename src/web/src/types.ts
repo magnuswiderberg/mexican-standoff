@@ -1,6 +1,6 @@
 // TypeScript mirror of src/MexicanStandoff.Server/Contracts (SignalR sends camelCase).
 
-export type ActionType = 'dodge' | 'load' | 'attack' | 'chest'
+export type ActionType = 'dodge' | 'load' | 'attack' | 'chest' | 'heal'
 
 export interface ActionDto {
   type: ActionType
@@ -33,6 +33,12 @@ export interface GameSnapshot {
   goldToWin: number
   maxBullets: number
   startingHp: number
+  /** HP ceiling — equals startingHp unless healing is on (then higher). Drives HP-pip count. */
+  maxHp: number
+  /** Healing enabled for this game (host's setting) — shows the Heal card. */
+  healingEnabled: boolean
+  /** Gold spent per heal. */
+  healCost: number
   duelSequenceLength: number
   players: PlayerSnapshot[]
 }
@@ -50,6 +56,8 @@ export interface RulesView {
 export interface CreateGameSettings {
   /** Seconds to pick an action; 0 disables the timer. */
   selectionTimerSeconds?: number | null
+  /** Enable the Heal action card (spend gold for HP). */
+  healing?: boolean | null
 }
 
 export interface CreateGameResult {
@@ -101,6 +109,7 @@ export type RevealStepType =
   | 'shotFired'
   | 'actionCancelled'
   | 'gunLoaded'
+  | 'playerHealed'
   | 'suddenDeathBullet'
   | 'chestResolved'
   | 'playerEliminated'
@@ -122,6 +131,8 @@ export interface RevealStepDto {
   hit?: boolean | null
   action?: ActionDto | null
   bulletsNow?: number | null
+  /** playerHealed: HP after the heal. */
+  hpNow?: number | null
   chestIndex?: number | null
   contenderIds?: string[] | null
   chestWinnerId?: string | null

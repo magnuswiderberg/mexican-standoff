@@ -58,15 +58,26 @@ public static class RoundResolver
             players[targetId] = target with { Hp = target.Hp - hitters.Count };
         }
 
-        // Phase 3: a hit player's Load/Chest is cancelled.
+        // Phase 3: a hit player's Load/Chest/Heal is cancelled (investment actions
+        // give no protection; only Dodge does). A cancelled Heal keeps its gold
+        // unless the no-refund rule spends it anyway — deducted here, where the
+        // cancellation is announced, so the wasted bars are part of the beat.
         var cancelled = new HashSet<string>();
         foreach (var (player, action) in seated)
         {
-            if (action is (PlayerAction.Load or PlayerAction.OpenChest) && hittersOf.ContainsKey(player.Id))
+            if (action is not (PlayerAction.Load or PlayerAction.OpenChest or PlayerAction.Heal)
+                || !hittersOf.ContainsKey(player.Id))
+                continue;
+
+            cancelled.Add(player.Id);
+            var goldLost = 0;
+            if (action is PlayerAction.Heal && !state.Parameters.HealCostRefundedOnCancel)
             {
-                cancelled.Add(player.Id);
-                reveal.Add(new RevealStep.ActionCancelled(player.Id, action));
+                goldLost = state.Parameters.HealCost;
+                var me = players[player.Id];
+                players[player.Id] = me with { Gold = me.Gold - goldLost };
             }
+            reveal.Add(new RevealStep.ActionCancelled(player.Id, action) { GoldLost = goldLost });
         }
 
         // Phase 4: loads.
@@ -78,6 +89,24 @@ public static class RoundResolver
             var me = players[player.Id];
             players[player.Id] = me with { Bullets = Math.Min(me.Bullets + 1, state.Parameters.MaxBullets) };
             reveal.Add(new RevealStep.GunLoaded(player.Id, players[player.Id].Bullets));
+        }
+
+        // Phase 4½: heals. An un-hit healer pays gold and restores HP (capped at
+        // MaxHp). A hit already cancelled the heal in phase 3 (and, under the
+        // no-refund rule, spent the gold there).
+        foreach (var (player, action) in seated)
+        {
+            if (action is not PlayerAction.Heal || cancelled.Contains(player.Id))
+                continue;
+
+            var me = players[player.Id];
+            var healed = me with
+            {
+                Hp = Math.Min(me.Hp + state.Parameters.HealAmount, state.Parameters.MaxHp),
+                Gold = me.Gold - state.Parameters.HealCost,
+            };
+            players[player.Id] = healed;
+            reveal.Add(new RevealStep.PlayerHealed(player.Id, healed.Hp, state.Parameters.HealCost));
         }
 
         // Phase 5: chests — a bar only when exactly one un-cancelled player targeted it.

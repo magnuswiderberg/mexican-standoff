@@ -27,10 +27,20 @@ public abstract record RevealStep
     /// <summary>A shot is fired; <paramref name="Hit"/> is false when the target dodged.</summary>
     public sealed record ShotFired(string ShooterId, string TargetId, bool Hit) : RevealStep;
 
-    /// <summary>A hit player's Load/Chest action is cancelled.</summary>
-    public sealed record ActionCancelled(string PlayerId, PlayerAction Action) : RevealStep;
+    /// <summary>
+    /// A hit player's Load/Chest/Heal action is cancelled. For a Heal cancelled
+    /// under the no-refund rule, <see cref="GoldLost"/> is the gold spent anyway
+    /// (0 otherwise).
+    /// </summary>
+    public sealed record ActionCancelled(string PlayerId, PlayerAction Action) : RevealStep
+    {
+        public int GoldLost { get; init; }
+    }
 
     public sealed record GunLoaded(string PlayerId, int BulletsNow) : RevealStep;
+
+    /// <summary>A player spent <paramref name="Cost"/> gold to restore HP to <paramref name="HpNow"/>.</summary>
+    public sealed record PlayerHealed(string PlayerId, int HpNow, int Cost) : RevealStep;
 
     /// <summary>Sudden death (Final Duel stalemate guard): a free bullet at sequence start.</summary>
     public sealed record SuddenDeathBullet(string PlayerId, int BulletsNow) : RevealStep;

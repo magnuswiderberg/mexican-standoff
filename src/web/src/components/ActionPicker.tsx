@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ActionDto, ActionType, GameSnapshot } from '../types'
 import { Avatar } from './PlayerBoard'
-import { AttackIcon, ChestIcon, DodgeIcon, LoadIcon, TargetIcon } from './icons'
+import { AttackIcon, ChestIcon, DodgeIcon, HealIcon, LoadIcon, TargetIcon } from './icons'
 
 interface CardSpec {
   type: ActionType
@@ -16,7 +16,7 @@ interface CardSpec {
 export function cardsFor(snapshot: GameSnapshot, playerId: string): CardSpec[] {
   const me = snapshot.players.find((p) => p.id === playerId)!
   const opponents = snapshot.players.filter((p) => p.isAlive && p.id !== playerId)
-  return [
+  const cards: CardSpec[] = [
     { type: 'dodge', icon: <DodgeIcon />, label: 'Dodge', disabledReason: null, needsTarget: null },
     {
       type: 'attack',
@@ -41,6 +41,22 @@ export function cardsFor(snapshot: GameSnapshot, playerId: string): CardSpec[] {
       needsTarget: snapshot.chestCount > 1 ? 'chest' : null,
     },
   ]
+  // Heal is a per-game option; a hit cancels it and burns the gold, so it's a bet.
+  if (snapshot.healingEnabled) {
+    cards.push({
+      type: 'heal',
+      icon: <HealIcon />,
+      label: 'Heal',
+      disabledReason:
+        me.hp >= snapshot.maxHp
+          ? 'HP is full'
+          : me.gold < snapshot.healCost
+            ? `need ${snapshot.healCost} gold`
+            : null,
+      needsTarget: null,
+    })
+  }
+  return cards
 }
 
 /**

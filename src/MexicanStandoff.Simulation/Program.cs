@@ -7,19 +7,24 @@ var masterSeed = ArgValue("--seed", 12345);
 var startingBullets = ArgValue("--start-bullets", 0);
 
 var baseline = GameParameters.Default with { StartingBullets = startingBullets };
+
+// Healing sweep (v2 experiment): start at 2 HP, spend gold to heal up to a raised
+// ceiling. Sweeps the HP ceiling (3, 4) and the per-heal cost (1, 2 bars) against
+// the no-heal baseline. Watch the `heal` column: if bots almost never heal, the
+// card is dead; the win-rate spread shows whether it rescues the strong turtle.
+GameParameters Heal(int maxHp, int cost, bool refund) =>
+    baseline with { HealingEnabled = true, MaxHp = maxHp, HealCost = cost, HealCostRefundedOnCancel = refund };
+
+// Refund policy: does a heal cancelled by a hit refund the gold (Load-like, the
+// default) or spend it anyway? Bots only heal when no opponent is armed, so their
+// heals are never cancelled — expect the two policies to look near-identical here.
 var configs = new (string Name, GameParameters Parameters)[]
 {
-    ($"baseline (hp2 bullets2 chest2 win6 startBullets{startingBullets})", baseline),
-    // Grabs-to-win variants (baseline is 3 grabs).
-    ("win=4 (2 grabs)", baseline with { GoldToWin = 4 }),
-    ("win=8 (4 grabs)", baseline with { GoldToWin = 8 }),
-    // Economy scalings: same 3 grabs, coarser/finer loot splits.
-    ("legacy chest=1 win=3", baseline with { GoldPerChest = 1, GoldToWin = 3 }),
-    ("chest=3 win=9", baseline with { GoldPerChest = 3, GoldToWin = 9 }),
-    ("hp=3", baseline with { StartingHp = 3 }),
-    ("bullets=3", baseline with { MaxBullets = 3 }),
-    ("2 chests from 4 players", baseline with { TwoChestsFromPlayers = 4 }),
-    ("single chest always", baseline with { TwoChestsFromPlayers = 99 }),
+    ($"baseline no-heal (hp2 maxHp2 startBullets{startingBullets})", baseline),
+    ("heal maxHp3 cost2 refund", Heal(maxHp: 3, cost: 2, refund: true)),
+    ("heal maxHp3 cost2 NO-refund", Heal(maxHp: 3, cost: 2, refund: false)),
+    ("heal maxHp4 cost2 refund", Heal(maxHp: 4, cost: 2, refund: true)),
+    ("heal maxHp4 cost2 NO-refund", Heal(maxHp: 4, cost: 2, refund: false)),
 };
 
 int[] playerCounts = [2, 3, 4, 5, 6, 8];
@@ -53,7 +58,7 @@ foreach (var (name, parameters) in configs)
         Console.WriteLine(
             $"  {playerCount}p | rounds avg {stats.AvgRounds,5:F1} p50 {stats.Percentile(50),3} p90 {stats.Percentile(90),3} "
             + $"| ~{stats.AvgRounds * 0.5,4:F1} min | timeout {stats.TimeoutRate:P1} "
-            + $"| lootLost {stats.RoundingLossRate:P0}/{stats.AvgGoldLostShareOfTarget(parameters.GoldToWin):P1} "
+            + $"| heal {stats.HealRate:P0}/{stats.AvgHeals:F1} "
             + $"| {reasons} | {winRates}");
     }
 

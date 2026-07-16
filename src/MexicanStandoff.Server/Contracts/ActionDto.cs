@@ -12,6 +12,7 @@ public sealed record ActionDto(string Type, string? TargetId = null, int? ChestI
         "load" => PlayerAction.Load.Instance,
         "attack" when !string.IsNullOrEmpty(TargetId) => new PlayerAction.Attack(TargetId),
         "chest" when ChestIndex is not null => new PlayerAction.OpenChest(ChestIndex.Value),
+        "heal" => PlayerAction.Heal.Instance,
         _ => throw new HubException($"Malformed action '{Type}'."),
     };
 
@@ -21,6 +22,7 @@ public sealed record ActionDto(string Type, string? TargetId = null, int? ChestI
         PlayerAction.Load => new ActionDto("load"),
         PlayerAction.Attack a => new ActionDto("attack", TargetId: a.TargetId),
         PlayerAction.OpenChest c => new ActionDto("chest", ChestIndex: c.ChestIndex),
+        PlayerAction.Heal => new ActionDto("heal"),
         _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
 }

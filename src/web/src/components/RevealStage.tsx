@@ -46,11 +46,26 @@ function stepSounds(step: RevealStepDto): [SfxName, number][] {
             ['whoosh', 280],
           ]
     case 'actionCancelled':
+      // A shot-off heal also clinks the wasted gold away after the fizzle.
+      return step.action?.type === 'heal' && (step.goldLost ?? 0) > 0
+        ? [
+            ['cancel', 0],
+            ['coin', 260],
+          ]
+        : [['cancel', 0]]
     case 'actionFizzled':
       return [['cancel', 0]]
     case 'gunLoaded':
     case 'suddenDeathBullet':
       return [['load', 0]]
+    case 'playerHealed':
+      // The heal chime, and — under no-refund — a coin clink for the bars spent.
+      return (step.goldLost ?? 0) > 0
+        ? [
+            ['heal', 0],
+            ['coin', 320],
+          ]
+        : [['heal', 0]]
     case 'chestResolved':
       if (step.chestWinnerId) return [['gold', 0]]
       if ((step.contenderIds?.length ?? 0) > 1) return [['standoff', 0]]
@@ -79,13 +94,14 @@ function stepSounds(step: RevealStepDto): [SfxName, number][] {
 export function RevealStage({
   job,
   meId,
-  startingHp,
+  maxHp,
   onDone,
   playSound,
 }: {
   job: RevealJob
   meId?: string | null
-  startingHp: number
+  /** HP-pip ceiling — the game's MaxHp (above the starting HP when healing is on). */
+  maxHp: number
   onDone: () => void
   playSound?: (name: SfxName) => void
 }) {
@@ -97,24 +113,29 @@ export function RevealStage({
 
   useEffect(() => {
     setStepIndex(-1)
-    let index = -1
     const timers: ReturnType<typeof setTimeout>[] = []
+    // Anchor every step to one start point rather than chaining each timer off the
+    // previous callback. A relative chain compounds lateness — a busy frame delays
+    // the tick, which arms the next tick even later — and the heavier renderer (the
+    // monitor) drifts further behind the phones with every step. Absolute offsets
+    // let a device that falls behind catch back up to the shared timeline instead.
+    const start = performance.now()
 
-    const tick = () => {
-      index += 1
-      if (index >= job.steps.length) {
-        onDoneRef.current()
-        return
-      }
+    const showStep = (index: number) => {
       setStepIndex(index)
       const step = job.steps[index]
       for (const [name, delay] of stepSounds(step)) {
         timers.push(setTimeout(() => soundRef.current?.(name), delay))
       }
-      timers.push(setTimeout(tick, stepDuration(step)))
     }
 
-    timers.push(setTimeout(tick, 600))
+    let offset = 600 // brief beat before the card flip
+    for (let i = 0; i < job.steps.length; i++) {
+      const at = offset
+      timers.push(setTimeout(() => showStep(i), Math.max(0, start + at - performance.now())))
+      offset += stepDuration(job.steps[i])
+    }
+    timers.push(setTimeout(() => onDoneRef.current(), Math.max(0, start + offset - performance.now())))
     return () => timers.forEach(clearTimeout)
   }, [job])
 
@@ -160,7 +181,7 @@ export function RevealStage({
       <div className="reveal-board">
         <PlayerBoard
           players={display.players}
-          maxHp={startingHp}
+          maxHp={maxHp}
           maxBullets={job.prev.maxBullets}
           goldToWin={job.prev.goldToWin}
           chestCount={job.prev.chestCount}

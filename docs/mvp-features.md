@@ -50,8 +50,22 @@ in MVP.)
 
 ## v2 backlog (explicitly out of MVP)
 
-- **Healing** — pay 2 gold bars to restore 1 HP (5th action card).
+- **Healing** — spend gold to restore 1 HP (5th action card), cancelled by a hit
+  (and the gold is spent anyway — healing under fire is a gamble) and disabled in
+  the Final Duel. Engine + bots + sim + tests done;
+  simulation says it only comes alive when `MaxHp` is raised above the starting HP
+  (recommended `StartHp 2 / MaxHp 3 / cost 2`) — see
+  [simulation-results.md](simulation-results.md). Remaining before it can ship:
+  the web reveal (`playerHealed` step, heal card + HP-over-start rendering).
+- **Boosters / start-of-game perks** — let each player pick a perk at game start,
+  including effects beyond today's mechanics (e.g. a steel plate that absorbs the
+  first shot, a head start bar, a loaded gun, extra/heal-capable HP). Superset of
+  the asymmetric-loadout idea below; a draft-style pick adds pre-game choice and
+  replay variety. Needs its own balance sim (fix each bot to a perk, measure win
+  rate by perk).
 - **Asymmetric setups** — varied starting loadouts (bar / loaded gun / extra HP).
+  Now folded into **Boosters** above; the plain-parameter loadouts already work
+  via `StartingBullets` / `StartingHp`.
 - **Single-chest variant** — only ever one chest, for a more aggressive opening.
 - **Accounts & saved stats** — Cosmos DB, easy re-join, stats history.
 - **Admin panel** — game/statistics dashboard.

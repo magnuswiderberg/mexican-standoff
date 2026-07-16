@@ -278,7 +278,7 @@ export function PlayerPage({ code }: { code: string }) {
                 <div className="spectator-banner"><SkullIcon /> You're out — spectating.</div>
                 <PlayerBoard
                   players={snapshot.players}
-                  maxHp={snapshot.startingHp}
+                  maxHp={snapshot.maxHp}
                   maxBullets={snapshot.maxBullets}
                   goldToWin={snapshot.goldToWin}
                   meId={playerId}
@@ -302,7 +302,7 @@ export function PlayerPage({ code }: { code: string }) {
                 )}
                 <PlayerBoard
                   players={snapshot.players}
-                  maxHp={snapshot.startingHp}
+                  maxHp={snapshot.maxHp}
                   maxBullets={snapshot.maxBullets}
                   goldToWin={snapshot.goldToWin}
                   meId={playerId}
@@ -349,7 +349,7 @@ export function PlayerPage({ code }: { code: string }) {
                 )}
                 <PlayerBoard
                   players={snapshot.players}
-                  maxHp={snapshot.startingHp}
+                  maxHp={snapshot.maxHp}
                   maxBullets={snapshot.maxBullets}
                   goldToWin={snapshot.goldToWin}
                   meId={playerId}
@@ -364,7 +364,7 @@ export function PlayerPage({ code }: { code: string }) {
                 {/* "Own stats always visible" holds in the duel too — both duelists' tiles above the planner. */}
                 <PlayerBoard
                   players={snapshot.players.filter((p) => p.isAlive)}
-                  maxHp={snapshot.startingHp}
+                  maxHp={snapshot.maxHp}
                   maxBullets={snapshot.maxBullets}
                   goldToWin={snapshot.goldToWin}
                   meId={playerId}
@@ -384,7 +384,7 @@ export function PlayerPage({ code }: { code: string }) {
               <>
                 <PlayerBoard
                   players={snapshot.players}
-                  maxHp={snapshot.startingHp}
+                  maxHp={snapshot.maxHp}
                   maxBullets={snapshot.maxBullets}
                   goldToWin={snapshot.goldToWin}
                   meId={playerId}
@@ -412,7 +412,7 @@ export function PlayerPage({ code }: { code: string }) {
             <RevealStage
               job={game.reveal}
               meId={playerId}
-              startingHp={game.reveal.prev.startingHp}
+              maxHp={game.reveal.prev.maxHp}
               onDone={game.finishReveal}
               playSound={sound.play}
             />
@@ -469,7 +469,7 @@ export function PlayerPage({ code }: { code: string }) {
             {snapshot && (
               <PlayerBoard
                 players={snapshot.players}
-                maxHp={snapshot.startingHp}
+                maxHp={snapshot.maxHp}
                 maxBullets={snapshot.maxBullets}
                 goldToWin={snapshot.goldToWin}
                 meId={playerId}

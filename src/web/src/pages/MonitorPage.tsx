@@ -153,7 +153,7 @@ export function MonitorPage({ code }: { code: string }) {
             </div>
             <PlayerBoard
               players={snapshot.players}
-              maxHp={snapshot.startingHp}
+              maxHp={snapshot.maxHp}
               maxBullets={snapshot.maxBullets}
               goldToWin={snapshot.goldToWin}
               lockedIds={game.locked?.lockedPlayerIds ?? []}
@@ -178,7 +178,7 @@ export function MonitorPage({ code }: { code: string }) {
           <div className="page tv">
             <RevealStage
               job={game.reveal}
-              startingHp={game.reveal.prev.startingHp}
+              maxHp={game.reveal.prev.maxHp}
               onDone={game.finishReveal}
               playSound={sound.play}
             />
@@ -226,7 +226,7 @@ export function MonitorPage({ code }: { code: string }) {
             {snapshot && (
               <PlayerBoard
                 players={snapshot.players}
-                maxHp={snapshot.startingHp}
+                maxHp={snapshot.maxHp}
                 maxBullets={snapshot.maxBullets}
                 goldToWin={snapshot.goldToWin}
               />

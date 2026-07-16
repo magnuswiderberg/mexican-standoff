@@ -17,6 +17,7 @@ public sealed record RevealStepDto(
     bool? Hit = null,
     ActionDto? Action = null,
     int? BulletsNow = null,
+    int? HpNow = null,
     int? ChestIndex = null,
     IReadOnlyList<string>? ContenderIds = null,
     string? ChestWinnerId = null,
@@ -36,10 +37,13 @@ public sealed record RevealStepDto(
             ShooterId: s.ShooterId, TargetId: s.TargetId, Hit: s.Hit),
 
         RevealStep.ActionCancelled s => new RevealStepDto("actionCancelled",
-            PlayerId: s.PlayerId, Action: ActionDto.From(s.Action)),
+            PlayerId: s.PlayerId, Action: ActionDto.From(s.Action), GoldLost: s.GoldLost),
 
         RevealStep.GunLoaded s => new RevealStepDto("gunLoaded",
             PlayerId: s.PlayerId, BulletsNow: s.BulletsNow),
+
+        RevealStep.PlayerHealed s => new RevealStepDto("playerHealed",
+            PlayerId: s.PlayerId, HpNow: s.HpNow, GoldLost: s.Cost),
 
         RevealStep.SuddenDeathBullet s => new RevealStepDto("suddenDeathBullet",
             PlayerId: s.PlayerId, BulletsNow: s.BulletsNow),

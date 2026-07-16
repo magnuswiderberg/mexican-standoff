@@ -14,6 +14,8 @@ public sealed class SweepStats
     public int Timeouts { get; private set; }
     public int GamesWithRoundingLoss { get; private set; }
     public int TotalGoldLostToRounding { get; private set; }
+    public int GamesWithAHeal { get; private set; }
+    public int TotalHeals { get; private set; }
 
     public void Add(GameOutcome outcome, IEnumerable<string> seatedStrategies)
     {
@@ -22,6 +24,10 @@ public sealed class SweepStats
         TotalGoldLostToRounding += outcome.GoldLostToRounding;
         if (outcome.GoldLostToRounding > 0)
             GamesWithRoundingLoss++;
+
+        TotalHeals += outcome.Heals;
+        if (outcome.Heals > 0)
+            GamesWithAHeal++;
 
         foreach (var strategy in seatedStrategies)
             _seatsByStrategy[strategy] = _seatsByStrategy.GetValueOrDefault(strategy) + 1;
@@ -48,6 +54,12 @@ public sealed class SweepStats
 
     /// <summary>Share of games where the loot split's rounding lost at least one bar.</summary>
     public double RoundingLossRate => (double)GamesWithRoundingLoss / Games;
+
+    /// <summary>Share of games where at least one heal happened.</summary>
+    public double HealRate => (double)GamesWithAHeal / Games;
+
+    /// <summary>Average heals per game.</summary>
+    public double AvgHeals => (double)TotalHeals / Games;
 
     /// <summary>Rounding losses as a share of the win target — comparable across rescaled economies.</summary>
     public double AvgGoldLostShareOfTarget(int goldToWin) =>
